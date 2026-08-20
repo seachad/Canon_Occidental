@@ -106,10 +106,151 @@
   .meta-grid p{ margin:4px 0 0; color:var(--text); }
   #entity-sources li,#entity-connections li{ color:var(--muted); margin:4px 0; }
 
-  /* ---------- Grafo ---------- */
-  .graph-card{ display:flex; flex-wrap:wrap; gap:12px; align-items:center; justify-content:center; min-height:clamp(160px,32vw,220px); }
-  .graph-node{ padding:10px 16px; border-radius:999px; background:rgba(255,255,255,.07); border:1px solid var(--line); font-size:clamp(.85rem,2.6vw,1rem); }
-  .graph-node.primary{ background:rgba(110,168,254,.2); color:var(--accent); border-color:rgba(110,168,254,.35); }
+  /* ---------- Grafo 3D ---------- */
+  .g-persona{ --gc:#6ea8fe; } .g-obra{ --gc:#b28cff; } .g-idea{ --gc:#4ade80; }
+  .g-evento{ --gc:#fb923c; } .g-lugar{ --gc:#22d3ee; }
+
+  #g-stage{
+    position:relative; background:#07111f; border:1px solid var(--line);
+    border-radius:var(--radius); overflow:hidden;
+  }
+  #g-stage:fullscreen{ border-radius:0; border:none; }
+  #graph3d{
+    position:relative; width:100%;
+    height:clamp(420px,68vh,760px); touch-action:none; cursor:grab;
+  }
+  #g-stage:fullscreen #graph3d{ height:100vh; }
+  #graph3d canvas{ display:block; width:100%; height:100%; }
+  .g-fallback{ display:grid; place-content:center; height:100%; text-align:center; color:var(--muted); padding:24px; }
+
+  /* etiquetas proyectadas */
+  .g-labels{ position:absolute; inset:0; pointer-events:none; }
+  .g-label{
+    position:absolute; top:0; left:0; pointer-events:auto;
+    background:rgba(7,17,31,.72); color:#e8eefb; border:1px solid rgba(255,255,255,.14);
+    border-left:3px solid var(--gc); border-radius:7px;
+    padding:3px 8px; font:600 11.5px/1.25 inherit; white-space:nowrap;
+    cursor:pointer; backdrop-filter:blur(3px); max-width:180px; overflow:hidden; text-overflow:ellipsis;
+  }
+  .g-label.is-selected{ background:var(--gc); color:#04111f; border-color:var(--gc); font-size:13px; z-index:3; }
+
+  /* barra superior del grafo */
+  .g-bar{
+    position:absolute; top:0; left:0; right:0; z-index:5;
+    display:flex; flex-wrap:wrap; gap:8px; align-items:center;
+    padding:10px; background:linear-gradient(rgba(7,17,31,.92),rgba(7,17,31,0));
+    pointer-events:none;
+  }
+  .g-bar > *{ pointer-events:auto; }
+  .g-searchwrap{ position:relative; flex:1 1 180px; min-width:0; max-width:280px; }
+  #g-search{
+    width:100%; min-height:38px; padding:8px 12px; border-radius:10px;
+    background:rgba(16,27,45,.92); border:1px solid var(--line); color:var(--text);
+    font:inherit; font-size:.9rem;
+  }
+  #g-search::placeholder{ color:var(--muted); }
+  #g-results{
+    display:none; position:absolute; top:calc(100% + 6px); left:0; right:0; z-index:8;
+    background:#101b2d; border:1px solid var(--line); border-radius:10px; overflow:hidden;
+  }
+  #g-results.is-open{ display:block; }
+  .g-result{
+    display:flex; align-items:center; gap:8px; width:100%; min-height:40px;
+    padding:8px 12px; background:none; border:none; border-bottom:1px solid var(--line);
+    color:var(--text); font:inherit; font-size:.9rem; text-align:left; cursor:pointer;
+  }
+  .g-result:last-child{ border-bottom:none; }
+  .g-result:hover,.g-result:focus-visible{ background:rgba(110,168,254,.14); }
+
+  .g-btn{
+    min-height:38px; padding:8px 12px; border-radius:10px; cursor:pointer;
+    background:rgba(16,27,45,.92); border:1px solid var(--line); color:var(--muted);
+    font:inherit; font-size:.82rem; white-space:nowrap;
+  }
+  .g-btn:hover,.g-btn:focus-visible{ color:var(--text); border-color:var(--accent); }
+
+  #g-toolbar{ position:absolute; left:0; right:0; bottom:0; z-index:5; padding:10px; pointer-events:none; }
+  #g-toolbar > *{ pointer-events:auto; }
+  .g-chips{ display:flex; flex-wrap:wrap; gap:6px; }
+  .g-chip{
+    display:inline-flex; align-items:center; gap:7px; min-height:36px;
+    padding:6px 11px; border-radius:999px; cursor:pointer;
+    background:rgba(16,27,45,.92); border:1px solid var(--line);
+    color:var(--muted); font:inherit; font-size:.8rem;
+  }
+  .g-chip[aria-pressed="true"]{ color:var(--text); border-color:var(--gc); background:rgba(16,27,45,.98); }
+  .g-chip[aria-pressed="false"]{ opacity:.45; }
+  .g-chip[aria-pressed="false"] .g-dot{ background:transparent; border:1px solid currentColor; }
+  .g-count{ color:var(--muted); font-size:.72rem; }
+  .g-dot{ width:9px; height:9px; border-radius:50%; background:var(--gc); flex:0 0 auto; }
+
+  /* panel flotante */
+  #g-panel{
+    position:absolute; z-index:7; top:62px; right:10px; width:min(340px,calc(100% - 20px));
+    max-height:calc(100% - 130px); display:none; flex-direction:column;
+    background:rgba(13,22,38,.97); border:1px solid var(--line); border-radius:14px;
+    box-shadow:0 18px 44px rgba(0,0,0,.5); backdrop-filter:blur(8px);
+  }
+  #g-panel.is-open{ display:flex; }
+  #g-close{
+    position:absolute; top:8px; right:8px; z-index:2;
+    width:34px; height:34px; border-radius:9px; cursor:pointer;
+    background:rgba(255,255,255,.07); border:1px solid var(--line); color:var(--text); font-size:1rem;
+  }
+  #g-panel-body{ overflow-y:auto; padding:16px; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; }
+  .g-panel-head{ display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding-right:38px; }
+  .g-pill{
+    display:inline-block; padding:3px 10px; border-radius:999px; font-size:.72rem;
+    text-transform:uppercase; letter-spacing:.09em; font-weight:700;
+    background:rgba(255,255,255,.08); color:var(--gc);
+    border:1px solid currentColor;
+  }
+  @supports (background: color-mix(in srgb, red 20%, transparent)){
+    .g-pill{
+      background:color-mix(in srgb, var(--gc) 20%, transparent);
+      border-color:color-mix(in srgb, var(--gc) 45%, transparent);
+    }
+  }
+  .g-dates{ color:var(--muted); font-size:.82rem; }
+  .g-panel-title{ margin:10px 0 6px; font-size:1.25rem; }
+  .g-summary{ margin:0 0 14px; color:var(--muted); font-size:.92rem; }
+  .g-links{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px; }
+  .g-link{
+    display:inline-flex; align-items:center; min-height:36px; padding:7px 13px;
+    border-radius:999px; background:rgba(110,168,254,.14); border:1px solid rgba(110,168,254,.3);
+    color:#cfe1ff; font-size:.83rem; font-weight:600;
+  }
+  .g-link:hover,.g-link:focus-visible{ background:rgba(110,168,254,.26); }
+  .g-link::after{ content:'↗'; margin-left:6px; font-size:.78rem; opacity:.75; }
+  .g-sub{
+    margin:0 0 8px; font-size:.72rem; text-transform:uppercase; letter-spacing:.11em;
+    color:var(--muted); font-weight:700;
+  }
+  .g-travel{ display:grid; gap:4px; margin-bottom:18px; }
+  .g-travel-item{
+    display:flex; align-items:center; gap:9px; width:100%; min-height:42px;
+    padding:8px 10px; border-radius:9px; cursor:pointer; text-align:left;
+    background:rgba(255,255,255,.035); border:1px solid transparent; color:var(--text); font:inherit;
+  }
+  .g-travel-item:hover,.g-travel-item:focus-visible{ background:rgba(110,168,254,.13); border-color:rgba(110,168,254,.3); }
+  .g-travel-item.is-off{ opacity:.42; }
+  .g-travel-txt{ display:flex; flex-direction:column; min-width:0; }
+  .g-travel-txt strong{ font-size:.9rem; font-weight:600; }
+  .g-travel-txt em{ font-style:normal; font-size:.74rem; color:var(--muted); }
+
+  .g-hint{ margin:10px 0 0; color:var(--muted); font-size:.85rem; }
+
+  @media (max-width:700px){
+    #graph3d{ height:clamp(380px,62vh,560px); }
+    #g-panel{
+      top:auto; bottom:0; left:0; right:0; width:100%;
+      max-height:62%; border-radius:16px 16px 0 0; border-bottom:none;
+    }
+    #g-toolbar{ bottom:auto; top:58px; }
+    .g-bar{ padding:8px; }
+    .g-chip{ font-size:.75rem; padding:5px 9px; }
+    .g-count{ display:none; }
+  }
 
   /* ---------- Cronología ---------- */
   .timeline{ display:grid; gap:12px; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); }
@@ -167,17 +308,17 @@
       <h1>Una plataforma semántica para pensar Occidente como red.</h1>
       <p>Conecta personas, obras, ideas, eventos y lugares en un grafo navegable, con fuentes, contexto y rutas de aprendizaje.</p>
       <div class="hero-actions">
-        <a class="btn primary" href="#explore">Explorar entidades</a>
-        <a class="btn secondary" href="#graph">Ver grafo</a>
+        <a class="btn primary" href="#graph">Abrir el grafo 3D</a>
+        <a class="btn secondary" href="#explore">Explorar entidades</a>
       </div>
     </div>
     <aside class="hero-card">
       <h3>Vista actual</h3>
       <p>Foco inicial: Grecia y Roma</p>
       <ul>
-        <li>50 entidades</li>
-        <li>120 relaciones</li>
-        <li>3 vistas principales</li>
+        <li>51 entidades</li>
+        <li>94 relaciones</li>
+        <li>5 grupos: personas, obras, ideas, eventos y lugares</li>
       </ul>
     </aside>
   </section>
@@ -214,15 +355,31 @@
   <section id="graph" class="section">
     <div class="section-title">
       <h2>Grafo semántico</h2>
-      <p>El corazón del producto: nodos, conexiones, rutas y contexto.</p>
+      <p>El corazón del producto. Arrastra para girar, rueda o pellizca para acercarte, pulsa un nodo para abrir su ficha.</p>
     </div>
-    <div class="graph-card">
-      <div class="graph-node primary">Sócrates</div>
-      <div class="graph-node">Platón</div>
-      <div class="graph-node">Aristóteles</div>
-      <div class="graph-node">Democracia</div>
-      <div class="graph-node">República</div>
+
+    <div id="g-stage">
+      <div id="graph3d"></div>
+
+      <div class="g-bar">
+        <div class="g-searchwrap">
+          <input id="g-search" type="search" placeholder="Buscar en el canon…" autocomplete="off" aria-label="Buscar entidad" />
+          <div id="g-results" role="listbox"></div>
+        </div>
+        <button type="button" class="g-btn" id="g-labels-btn">Etiquetas</button>
+        <button type="button" class="g-btn" id="g-reset">Reiniciar</button>
+        <button type="button" class="g-btn" id="g-fullscreen">Ampliar</button>
+      </div>
+
+      <div id="g-toolbar"></div>
+
+      <aside id="g-panel" aria-live="polite">
+        <button type="button" id="g-close" aria-label="Cerrar ficha">✕</button>
+        <div id="g-panel-body"></div>
+      </aside>
     </div>
+
+    <p class="g-hint">51 entidades y 94 relaciones del foco inicial (Grecia y Roma). Cada ficha enlaza a Wikipedia y, cuando existe, al texto completo en Wikisource.</p>
   </section>
 
   <section id="timeline" class="section">
@@ -374,5 +531,9 @@
   renderEntity('socrates');
 })();
 </script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="graph-data.js"></script>
+<script src="graph.js"></script>
 </body>
 </html>
