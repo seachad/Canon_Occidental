@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>El Canon de Occidente</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">El Canon de Occidente</div>
+      <nav>
+        <a href="#explore">Explorar</a>
+        <a href="#entity">Entidad</a>
+        <a href="#graph">Grafo</a>
+        <a href="#timeline">Cronología</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">Knowledge Operating System</p>
+          <h1>Una plataforma semántica para pensar Occidente como red.</h1>
+          <p>
+            Conecta personas, obras, ideas, eventos y lugares en un grafo navegable,
+            con fuentes, contexto y rutas de aprendizaje.
+          </p>
+          <div class="hero-actions">
+            <a class="btn primary" href="#explore">Explorar entidades</a>
+            <a class="btn secondary" href="#graph">Ver grafo</a>
+          </div>
+        </div>
+        <div class="hero-card">
+          <h3>Vista actual</h3>
+          <p>Foco inicial: Grecia y Roma</p>
+          <ul>
+            <li>50 entidades</li>
+            <li>120 relaciones</li>
+            <li>3 vistas principales</li>
+          </ul>
+        </div>
+      </section>
+
+      <section id="explore" class="section">
+        <div class="section-title">
+          <h2>Entidades destacadas</h2>
+          <p>Selecciona una para ver su ficha y sus conexiones.</p>
+        </div>
+        <div class="cards" id="entity-list"></div>
+      </section>
+
+      <section id="entity" class="section two-col">
+        <article class="panel">
+          <h3 id="entity-name">Sócrates</h3>
+          <p id="entity-type" class="pill">Filósofo</p>
+          <p id="entity-summary"></p>
+          <div class="meta-grid">
+            <div>
+              <strong>Fechas</strong>
+              <p id="entity-dates"></p>
+            </div>
+            <div>
+              <strong>Lugar</strong>
+              <p id="entity-place"></p>
+            </div>
+          </div>
+          <div>
+            <strong>Fuentes</strong>
+            <ul id="entity-sources"></ul>
+          </div>
+        </article>
+
+        <article class="panel">
+          <h3>Conexiones</h3>
+          <ul id="entity-connections"></ul>
+        </article>
+      </section>
+
+      <section id="graph" class="section">
+        <div class="section-title">
+          <h2>Grafo semántico</h2>
+          <p>El corazón del producto: nodos, conexiones, rutas y contexto.</p>
+        </div>
+        <div class="graph-card">
+          <div class="graph-node primary">Sócrates</div>
+          <div class="graph-node">Platón</div>
+          <div class="graph-node">Aristóteles</div>
+          <div class="graph-node">Democracia</div>
+          <div class="graph-node">República</div>
+        </div>
+      </section>
+
+      <section id="timeline" class="section">
+        <div class="section-title">
+          <h2>Cronología</h2>
+          <p>Una línea temporal que reúne personas, obras y eventos.</p>
+        </div>
+        <div class="timeline">
+          <div class="timeline-item">
+            <span class="year">470 a. C.</span>
+            <p>Nace Sócrates.</p>
+          </div>
+          <div class="timeline-item">
+            <span class="year">427 a. C.</span>
+            <p>Nace Platón.</p>
+          </div>
+          <div class="timeline-item">
+            <span class="year">384 a. C.</span>
+            <p>Nace Aristóteles.</p>
+          </div>
+          <div class="timeline-item">
+            <span class="year">399 a. C.</span>
+            <p>Muerte de Sócrates.</p>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,41 @@
+:root {
+  color-scheme: dark;
+  --bg: #07111f;
+  --panel: #101b2d;
+  --text: #f5f7fb;
+  --muted: #94aac8;
+  --accent: #6ea8fe;
+  --accent-2: #b28cff;
+}
+* { box-sizing: border-box; }
+body { margin: 0; font-family: Inter, Arial, sans-serif; background: var(--bg); color: var(--text); }
+a { color: inherit; text-decoration: none; }
+.topbar { display: flex; justify-content: space-between; align-items: center; padding: 16px 24px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+nav { display: flex; gap: 16px; color: var(--muted); }
+main { padding: 24px; }
+.hero { display: grid; grid-template-columns: 2fr 1fr; gap: 24px; padding: 32px 0 40px; }
+.hero-copy h1 { font-size: 2.2rem; margin: 6px 0 10px; }
+.eyebrow { text-transform: uppercase; color: var(--accent); letter-spacing: 0.2em; font-size: 0.8rem; }
+.hero-card, .panel, .graph-card { background: var(--panel); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 20px; }
+.hero-actions { display: flex; gap: 12px; margin-top: 18px; flex-wrap: wrap; }
+.btn { padding: 10px 14px; border-radius: 999px; }
+.btn.primary { background: var(--accent); color: #04111f; }
+.btn.secondary { background: rgba(255,255,255,0.08); }
+.section { margin-top: 24px; }
+.section-title { margin-bottom: 12px; }
+.cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.card { background: var(--panel); border-radius: 16px; padding: 16px; border: 1px solid rgba(255,255,255,0.08); cursor: pointer; }
+.pill { display: inline-block; padding: 6px 10px; border-radius: 999px; background: rgba(178,140,255,0.15); color: #cdbdff; font-size: 0.9rem; }
+.two-col { display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 16px; }
+.meta-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.graph-card { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; min-height: 220px; }
+.graph-node { padding: 10px 14px; border-radius: 999px; background: rgba(255,255,255,0.07); }
+.graph-node.primary { background: rgba(110,168,254,0.2); color: var(--accent); }
+.timeline { display: grid; gap: 12px; }
+.timeline-item { background: var(--panel); border-radius: 12px; padding: 16px; border: 1px solid rgba(255,255,255,0.08); }
+.year { color: var(--accent); font-weight: 700; }
+@media (max-width: 768px) {
+  .hero, .two-col, .cards { grid-template-columns: 1fr; }
+  .topbar { flex-direction: column; align-items: flex-start; gap: 8px; }
+  main { padding: 16px; }
+}
