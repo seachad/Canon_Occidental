@@ -1,4 +1,5 @@
-/* El Canon de Occidente — grafo semántico 3D (Three.js r128)
+/* El Canon de Occidente — globo semántico 3D (Three.js r128)
+   Los nodos viven sobre la superficie de una esfera: girar el globo es navegar el canon.
    Sin dependencias más allá de three.min.js. Todo el estado vive en este módulo. */
 (function () {
   'use strict';
@@ -7,10 +8,12 @@
   if (!mount) return;
 
   function fail(msg) {
-    mount.innerHTML = '<div class="g-fallback"><p><strong>' + msg + '</strong></p>' +
-      '<p>Puedes seguir explorando las entidades destacadas más arriba.</p></div>';
-    var bar = document.querySelector('.g-bar');
-    if (bar) bar.style.display = 'none';
+    mount.innerHTML = '<div class="g-fallback"><strong>' + msg + '</strong>' +
+      '<p>Prueba con un navegador con WebGL activado.</p></div>';
+    ['.g-bar', '#g-toolbar', '#g-compass', '#g-time', '#g-hint'].forEach(function (sel) {
+      var e = document.querySelector(sel);
+      if (e) e.style.display = 'none';
+    });
   }
 
   if (typeof THREE === 'undefined' || !window.CANON) {
@@ -25,8 +28,11 @@
   var isTouch = window.matchMedia('(hover: none)').matches;
   var isSmall = window.matchMedia('(max-width: 700px)').matches;
 
+  var R = 60;              // radio del globo
+  var ARC_SEG = 16;        // segmentos por arista
+
   /* ============================================================
-     1. Índices y grados
+     1. Índices, grados y cronología
      ============================================================ */
   var byId = {};
   NODES.forEach(function (n, i) { n.idx = i; n.deg = 0; n.nbrs = []; byId[n.id] = n; });
@@ -41,8 +47,40 @@
     edges.push({ a: a, b: b, rel: e[2] });
   });
 
+  var ROMAN = { I: 1, V: 5, X: 10, L: 50, C: 100, D: 500, M: 1000 };
+  function roman(s) {
+    var v = 0;
+    for (var i = 0; i < s.length; i++) {
+      var c = ROMAN[s[i]], nx = ROMAN[s[i + 1]];
+      v += (nx && nx > c) ? -c : c;
+    }
+    return v;
+  }
+
+  /* '470–399 a. C.' · 's. VIII a. C.' · '63 a. C. – 14 d. C.' · '476' · '—' */
+  function parseYears(str) {
+    if (!str || str === '—') return null;
+    var s = str.replace(/([–—-])\s*([IVXLCDM]+)\b/g, '$1s. $2');
+    var re = /(\d+)|s\.\s*([IVXLCDM]+)/g, m, out = [];
+    while ((m = re.exec(s)) !== null) {
+      var rest = s.slice(m.index);
+      var ia = rest.indexOf('a. C.'), id = rest.indexOf('d. C.');
+      var bc = ia !== -1 && (id === -1 || ia < id);
+      var v = m[1] ? parseInt(m[1], 10) : roman(m[2]) * 100 - 50;
+      out.push(bc ? -v : v);
+    }
+    if (!out.length) return null;
+    return { a: out[0], b: out[out.length - 1] };
+  }
+
+  NODES.forEach(function (n) {
+    var y = parseYears(n.d);
+    n.y0 = y ? y.a : null;
+    n.y1 = y ? y.b : null;
+  });
+
   /* ============================================================
-     2. Layout dirigido por fuerzas (determinista)
+     2. Layout esférico dirigido por fuerzas (determinista)
      ============================================================ */
   function mulberry32(seed) {
     return function () {
@@ -54,28 +92,43 @@
   }
 
   function computeLayout() {
-    var rnd = mulberry32(20260820);
+    var rnd = mulberry32(20260821);
     var N = NODES.length;
     var px = new Float64Array(N), py = new Float64Array(N), pz = new Float64Array(N);
     var fx = new Float64Array(N), fy = new Float64Array(N), fz = new Float64Array(N);
 
+    /* semilla: espiral de Fibonacci con jitter → reparto inicial uniforme */
+    var GA = Math.PI * (3 - Math.sqrt(5));
     for (var i = 0; i < N; i++) {
-      var u = rnd() * 2 - 1, th = rnd() * Math.PI * 2, r = 26 * Math.cbrt(rnd());
-      var sp = Math.sqrt(1 - u * u);
-      px[i] = r * sp * Math.cos(th); py[i] = r * sp * Math.sin(th); pz[i] = r * u;
+      var y = 1 - (i + 0.5) * 2 / N;
+      var rad = Math.sqrt(Math.max(0, 1 - y * y));
+      var th = GA * i + rnd() * 0.7;
+      px[i] = R * rad * Math.cos(th); py[i] = R * y; pz[i] = R * rad * Math.sin(th);
     }
 
-    var REP = 340, REST = 17, KS = 0.06, GRAV = 0.012, ITER = 520;
+    var groupKeys = Object.keys(GROUPS);
+    var gIndex = {};
+    groupKeys.forEach(function (g, i) { gIndex[g] = i; });
+    var cx = new Float64Array(groupKeys.length), cy = new Float64Array(groupKeys.length),
+        cz = new Float64Array(groupKeys.length), cn = new Float64Array(groupKeys.length);
+
+    var REP = 900, REST = 22, KS = 0.06, GK = 0.014, ITER = 600;
 
     for (var it = 0; it < ITER; it++) {
       fx.fill(0); fy.fill(0); fz.fill(0);
+      cx.fill(0); cy.fill(0); cz.fill(0); cn.fill(0);
+
+      for (var c = 0; c < N; c++) {
+        var gi = gIndex[NODES[c].g];
+        cx[gi] += px[c]; cy[gi] += py[c]; cz[gi] += pz[c]; cn[gi]++;
+      }
 
       for (var a = 0; a < N; a++) {
         for (var b = a + 1; b < N; b++) {
           var dx = px[a] - px[b], dy = py[a] - py[b], dz = pz[a] - pz[b];
           var d2 = dx * dx + dy * dy + dz * dz;
           if (d2 < 0.01) { d2 = 0.01; dx = (rnd() - 0.5) * 0.1; dy = (rnd() - 0.5) * 0.1; }
-          var d = Math.sqrt(d2), f = REP / d2 / d;
+          var f = REP / d2 / Math.sqrt(d2);
           fx[a] += dx * f; fy[a] += dy * f; fz[a] += dz * f;
           fx[b] -= dx * f; fy[b] -= dy * f; fz[b] -= dz * f;
         }
@@ -90,24 +143,33 @@
         fx[ib] -= ex * s; fy[ib] -= ey * s; fz[ib] -= ez * s;
       }
 
-      var cool = 1 - it / ITER;
+      /* cohesión suave por grupo: regiones de color legibles en el globo */
       for (var k = 0; k < N; k++) {
-        fx[k] -= px[k] * GRAV; fy[k] -= py[k] * GRAV; fz[k] -= pz[k] * GRAV;
-        var step = Math.min(2.2, 0.55 + cool * 1.6);
-        var fl = Math.sqrt(fx[k] * fx[k] + fy[k] * fy[k] + fz[k] * fz[k]) || 1;
+        var g2 = gIndex[NODES[k].g];
+        if (cn[g2] > 1) {
+          fx[k] += (cx[g2] / cn[g2] - px[k]) * GK;
+          fy[k] += (cy[g2] / cn[g2] - py[k]) * GK;
+          fz[k] += (cz[g2] / cn[g2] - pz[k]) * GK;
+        }
+      }
+
+      var cool = 1 - it / ITER;
+      var step = 0.5 + cool * 1.7;
+      for (var m = 0; m < N; m++) {
+        var fl = Math.sqrt(fx[m] * fx[m] + fy[m] * fy[m] + fz[m] * fz[m]) || 1;
         var cl = Math.min(1, step / fl);
-        px[k] += fx[k] * cl; py[k] += fy[k] * cl; pz[k] += fz[k] * cl;
+        px[m] += fx[m] * cl; py[m] += fy[m] * cl; pz[m] += fz[m] * cl;
+        /* proyección a la esfera: el grafo es siempre un globo */
+        var len = Math.sqrt(px[m] * px[m] + py[m] * py[m] + pz[m] * pz[m]) || 1;
+        px[m] = px[m] / len * R; py[m] = py[m] / len * R; pz[m] = pz[m] / len * R;
       }
     }
 
-    var max = 0;
-    for (var m = 0; m < N; m++) {
-      var rr = Math.sqrt(px[m] * px[m] + py[m] * py[m] + pz[m] * pz[m]);
-      if (rr > max) max = rr;
-    }
-    var scale = 58 / (max || 1);
     NODES.forEach(function (n, i) {
-      n.pos = new THREE.Vector3(px[i] * scale, py[i] * scale, pz[i] * scale);
+      n.dir = new THREE.Vector3(px[i], py[i], pz[i]).normalize();
+      n.radius = 1.35 + Math.sqrt(n.deg) * 0.7;
+      n.pos = n.dir.clone().multiplyScalar(R + n.radius * 0.55);
+      n.surf = n.dir.clone().multiplyScalar(R);
     });
   }
 
@@ -116,12 +178,12 @@
   /* ============================================================
      3. Escena
      ============================================================ */
-  var BG = 0x07111f;
+  var BG = 0x050b16;
   var scene = new THREE.Scene();
   scene.background = new THREE.Color(BG);
-  scene.fog = new THREE.FogExp2(BG, 0.0062);
+  scene.fog = new THREE.FogExp2(BG, 0.0026);
 
-  var camera = new THREE.PerspectiveCamera(52, 1, 0.5, 800);
+  var camera = new THREE.PerspectiveCamera(50, 1, 0.5, 1400);
   var renderer;
   try {
     renderer = new THREE.WebGLRenderer({ antialias: !isSmall, powerPreference: 'high-performance' });
@@ -132,68 +194,268 @@
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, isSmall ? 1.6 : 2));
   mount.appendChild(renderer.domElement);
 
-  scene.add(new THREE.AmbientLight(0xffffff, 0.62));
-  var keyLight = new THREE.DirectionalLight(0xffffff, 0.75);
+  scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+  var keyLight = new THREE.DirectionalLight(0xdfeaff, 0.85);
   scene.add(keyLight);
+  var rimLight = new THREE.DirectionalLight(0x7f6bff, 0.35);
+  rimLight.position.set(-1, 0.6, -1);
+  scene.add(rimLight);
 
-  var sphereGeo = new THREE.SphereGeometry(1, 18, 14);
+  /* --- estrellas --- */
+  (function stars() {
+    var COUNT = 1500, rnd = mulberry32(7727);
+    var pos = new Float32Array(COUNT * 3), col = new Float32Array(COUNT * 3);
+    var tint = [new THREE.Color(0xffffff), new THREE.Color(0xa9c6ff), new THREE.Color(0xffd9a8)];
+    for (var i = 0; i < COUNT; i++) {
+      var u = rnd() * 2 - 1, th = rnd() * Math.PI * 2, sp = Math.sqrt(1 - u * u);
+      var r = 340 + rnd() * 420;
+      pos[i * 3] = r * sp * Math.cos(th); pos[i * 3 + 1] = r * u; pos[i * 3 + 2] = r * sp * Math.sin(th);
+      var c = tint[(rnd() * 3) | 0].clone().multiplyScalar(0.45 + rnd() * 0.55);
+      col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b;
+    }
+    var geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    scene.add(new THREE.Points(geo, new THREE.PointsMaterial({
+      size: 1.8, sizeAttenuation: true, vertexColors: true,
+      transparent: true, opacity: 0.9, fog: false, depthWrite: false
+    })));
+  })();
+
+  /* --- núcleo opaco: oculta la cara oculta del globo y da profundidad --- */
+  var core = new THREE.Mesh(
+    new THREE.SphereGeometry(R * 0.985, 56, 40),
+    new THREE.MeshPhongMaterial({
+      color: 0x0a1730, emissive: 0x050d1c, specular: 0x1d3355, shininess: 14,
+      transparent: true, opacity: 0.94
+    })
+  );
+  scene.add(core);
+
+  /* --- retícula de meridianos y paralelos --- */
+  function circlePoints(radius, lat, tilt) {
+    var pts = [], SEG = 96;
+    for (var i = 0; i <= SEG; i++) {
+      var t = i / SEG * Math.PI * 2;
+      var y = Math.sin(lat) * radius, rr = Math.cos(lat) * radius;
+      var v = new THREE.Vector3(rr * Math.cos(t), y, rr * Math.sin(t));
+      if (tilt) v.applyAxisAngle(new THREE.Vector3(0, 0, 1), tilt);
+      pts.push(v);
+    }
+    return pts;
+  }
+
+  function addLineLoop(pts, color, opacity) {
+    var geo = new THREE.BufferGeometry().setFromPoints(pts);
+    var line = new THREE.Line(geo, new THREE.LineBasicMaterial({
+      color: color, transparent: true, opacity: opacity, depthWrite: false
+    }));
+    scene.add(line);
+    return line;
+  }
+
+  (function grid() {
+    var GR = R * 0.995;
+    for (var i = 0; i < 12; i++) addLineLoop(circlePoints(GR, 0, 0).map(function (p) {
+      return p.clone().applyAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI / 2)
+        .applyAxisAngle(new THREE.Vector3(0, 1, 0), i * Math.PI / 12);
+    }), 0x2b4c7d, 0.34);
+    [-60, -30, 30, 60].forEach(function (lat) {
+      addLineLoop(circlePoints(GR, lat * Math.PI / 180, 0), 0x2b4c7d, 0.3);
+    });
+    addLineLoop(circlePoints(GR, 0, 0), 0x6ea8fe, 0.5);          // ecuador
+    addLineLoop(circlePoints(R * 1.17, 0, 0), 0xb28cff, 0.22);   // anillo orbital
+  })();
+
+  /* --- atmósfera (fresnel) --- */
+  scene.add(new THREE.Mesh(
+    new THREE.SphereGeometry(R * 1.13, 48, 32),
+    new THREE.ShaderMaterial({
+      uniforms: { uColor: { value: new THREE.Color(0x3d7ddb) }, uInt: { value: 0.85 } },
+      vertexShader: 'varying vec3 vN; varying vec3 vP;' +
+        'void main(){ vN = normalize(normalMatrix * normal); vec4 mv = modelViewMatrix * vec4(position,1.0);' +
+        ' vP = mv.xyz; gl_Position = projectionMatrix * mv; }',
+      fragmentShader: 'uniform vec3 uColor; uniform float uInt; varying vec3 vN; varying vec3 vP;' +
+        'void main(){ float f = pow(1.0 - abs(dot(vN, normalize(-vP))), 2.7);' +
+        ' gl_FragColor = vec4(uColor, f * uInt); }',
+      side: THREE.BackSide, blending: THREE.AdditiveBlending,
+      transparent: true, depthWrite: false
+    })
+  ));
+
+  /* --- halo de nodo --- */
+  var glowTex = (function () {
+    var c = document.createElement('canvas');
+    c.width = c.height = 128;
+    var g = c.getContext('2d');
+    var grd = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+    grd.addColorStop(0, 'rgba(255,255,255,1)');
+    grd.addColorStop(0.22, 'rgba(255,255,255,.62)');
+    grd.addColorStop(0.55, 'rgba(255,255,255,.16)');
+    grd.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = grd; g.fillRect(0, 0, 128, 128);
+    var t = new THREE.CanvasTexture(c);
+    t.needsUpdate = true;
+    return t;
+  })();
+
+  var sphereGeo = new THREE.SphereGeometry(1, 20, 16);
   var nodeGroup = new THREE.Group();
   scene.add(nodeGroup);
 
   NODES.forEach(function (n) {
     var col = new THREE.Color(GROUPS[n.g].color);
     n.baseColor = col;
-    n.radius = 1.15 + Math.sqrt(n.deg) * 0.62;
-    n.mat = new THREE.MeshLambertMaterial({ color: col.clone(), transparent: true, opacity: 1 });
+    n.mat = new THREE.MeshPhongMaterial({
+      color: col.clone(), emissive: col.clone().multiplyScalar(0.3),
+      specular: 0x9fb6d8, shininess: 55, transparent: true, opacity: 1
+    });
     n.mesh = new THREE.Mesh(sphereGeo, n.mat);
     n.mesh.position.copy(n.pos);
     n.mesh.scale.setScalar(n.radius);
     n.mesh.userData.node = n;
     nodeGroup.add(n.mesh);
+
+    n.glowMat = new THREE.SpriteMaterial({
+      map: glowTex, color: col.clone(), transparent: true, opacity: 0.5,
+      blending: THREE.AdditiveBlending, depthWrite: false, fog: false
+    });
+    n.glow = new THREE.Sprite(n.glowMat);
+    n.glow.position.copy(n.pos);
+    n.glow.scale.setScalar(n.radius * 5.5);
+    nodeGroup.add(n.glow);
   });
 
-  function makeLines(color, opacity, width) {
-    var mat = new THREE.LineBasicMaterial({ color: color, transparent: true, opacity: opacity, linewidth: width || 1 });
+  /* --- aristas como arcos sobre la superficie --- */
+  var _a = new THREE.Vector3(), _b = new THREE.Vector3();
+  edges.forEach(function (e) {
+    var va = e.a.dir, vb = e.b.dir;
+    var dot = Math.max(-1, Math.min(1, va.dot(vb)));
+    var ang = Math.acos(dot);
+    var lift = 1 + 0.055 + 0.2 * Math.min(1, ang / 1.6);
+    var ca = e.a.baseColor, cb = e.b.baseColor;
+    var pts = [], cols = [];
+    for (var i = 0; i <= ARC_SEG; i++) {
+      var t = i / ARC_SEG, v;
+      if (ang < 1e-4) v = va.clone();
+      else {
+        _a.copy(va).multiplyScalar(Math.sin((1 - t) * ang) / Math.sin(ang));
+        _b.copy(vb).multiplyScalar(Math.sin(t * ang) / Math.sin(ang));
+        v = _a.clone().add(_b).normalize();
+      }
+      pts.push(v.multiplyScalar(R * (1 + (lift - 1) * Math.sin(Math.PI * t))));
+      cols.push(ca.clone().lerp(cb, t));
+    }
+    /* pares de vértices para LineSegments */
+    var lp = new Float32Array(ARC_SEG * 6), lc = new Float32Array(ARC_SEG * 6), lh = new Float32Array(ARC_SEG * 6);
+    for (var s = 0; s < ARC_SEG; s++) {
+      var o = s * 6;
+      lp[o] = pts[s].x; lp[o + 1] = pts[s].y; lp[o + 2] = pts[s].z;
+      lp[o + 3] = pts[s + 1].x; lp[o + 4] = pts[s + 1].y; lp[o + 5] = pts[s + 1].z;
+      var c1 = cols[s], c2 = cols[s + 1];
+      lc[o] = c1.r; lc[o + 1] = c1.g; lc[o + 2] = c1.b;
+      lc[o + 3] = c2.r; lc[o + 4] = c2.g; lc[o + 5] = c2.b;
+      var h1 = c1.clone().lerp(new THREE.Color(0xffffff), 0.55);
+      var h2 = c2.clone().lerp(new THREE.Color(0xffffff), 0.55);
+      lh[o] = h1.r; lh[o + 1] = h1.g; lh[o + 2] = h1.b;
+      lh[o + 3] = h2.r; lh[o + 4] = h2.g; lh[o + 5] = h2.b;
+    }
+    e.lp = lp; e.lc = lc; e.lh = lh;
+  });
+
+  function makeArcLayer(opacity) {
     var geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(edges.length * 6), 3));
-    var ls = new THREE.LineSegments(geo, mat);
+    var cap = edges.length * ARC_SEG * 6;
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(cap), 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(cap), 3));
+    var ls = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({
+      vertexColors: true, transparent: true, opacity: opacity,
+      blending: THREE.AdditiveBlending, depthWrite: false
+    }));
     ls.frustumCulled = false;
     scene.add(ls);
     return ls;
   }
-  var baseLines = makeLines(0x3d5c86, 0.34);
-  var hiLines = makeLines(0x9ec5ff, 0.95, 2);
+  var baseArcs = makeArcLayer(0.38);
+  var hiArcs = makeArcLayer(1);
 
-  function rebuildLines() {
-    var basePos = baseLines.geometry.attributes.position.array;
-    var hiPos = hiLines.geometry.attributes.position.array;
-    var bi = 0, hi = 0;
+  function rebuildArcs() {
+    var bp = baseArcs.geometry.attributes.position.array, bc = baseArcs.geometry.attributes.color.array;
+    var hp = hiArcs.geometry.attributes.position.array, hc = hiArcs.geometry.attributes.color.array;
+    var bi = 0, hi = 0, len = ARC_SEG * 6;
     for (var i = 0; i < edges.length; i++) {
       var e = edges[i];
       if (!visible(e.a) || !visible(e.b)) continue;
-      var isHi = selected && (e.a === selected || e.b === selected);
-      var arr = isHi ? hiPos : basePos;
-      var o = isHi ? hi : bi;
-      arr[o] = e.a.pos.x; arr[o + 1] = e.a.pos.y; arr[o + 2] = e.a.pos.z;
-      arr[o + 3] = e.b.pos.x; arr[o + 4] = e.b.pos.y; arr[o + 5] = e.b.pos.z;
-      if (isHi) hi += 6; else bi += 6;
+      if (selected && (e.a === selected || e.b === selected)) {
+        hp.set(e.lp, hi); hc.set(e.lh, hi); hi += len;
+      } else {
+        bp.set(e.lp, bi); bc.set(e.lc, bi); bi += len;
+      }
     }
-    baseLines.geometry.setDrawRange(0, bi / 3);
-    hiLines.geometry.setDrawRange(0, hi / 3);
-    baseLines.geometry.attributes.position.needsUpdate = true;
-    hiLines.geometry.attributes.position.needsUpdate = true;
+    baseArcs.geometry.setDrawRange(0, bi / 3);
+    hiArcs.geometry.setDrawRange(0, hi / 3);
+    baseArcs.geometry.attributes.position.needsUpdate = true;
+    baseArcs.geometry.attributes.color.needsUpdate = true;
+    hiArcs.geometry.attributes.position.needsUpdate = true;
+    hiArcs.geometry.attributes.color.needsUpdate = true;
+    baseArcs.material.opacity = selected ? 0.14 : 0.38;
   }
 
   /* ============================================================
-     4. Estado
+     4. Estado (persistente: todo lo que elige el usuario se guarda)
      ============================================================ */
+  var STORE_KEY = 'canon.state.v1';
+  var DEFAULT_ID = 'socrates';
+  var DEFAULT_YEARS = 50;
+  var YEARS_MIN = 1, YEARS_MAX = 1000000;
+
+  function loadState() {
+    try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; }
+    catch (err) { return {}; }
+  }
+  var saved = loadState();
+
+  function save() {
+    try {
+      localStorage.setItem(STORE_KEY, JSON.stringify({
+        sel: selected ? selected.id : DEFAULT_ID,
+        years: years,
+        groups: activeGroups,
+        timeTypes: timeTypes,
+        timeUserSet: timeUserSet,
+        labelMode: labelMode,
+        timeCollapsed: timeCollapsed
+      }));
+    } catch (err) { /* almacenamiento no disponible */ }
+  }
+
   var activeGroups = {};
-  Object.keys(GROUPS).forEach(function (g) { activeGroups[g] = true; });
+  Object.keys(GROUPS).forEach(function (g) {
+    activeGroups[g] = saved.groups && typeof saved.groups[g] === 'boolean' ? saved.groups[g] : true;
+  });
+  if (!Object.keys(activeGroups).some(function (g) { return activeGroups[g]; })) {
+    Object.keys(activeGroups).forEach(function (g) { activeGroups[g] = true; });
+  }
 
-  var selected = null, hovered = null;
-  var labelMode = isSmall ? 'clave' : 'todas';   // todas | clave | ninguna
+  var years = Math.max(YEARS_MIN, Math.min(YEARS_MAX, parseInt(saved.years, 10) || DEFAULT_YEARS));
 
-  function visible(n) { return activeGroups[n.g]; }
+  /* siempre hay un elemento seleccionado: es el centro de la ventana temporal */
+  var selected = byId[saved.sel] || byId[DEFAULT_ID] || NODES[0];
+  var hovered = null;
+  var labelMode = saved.labelMode || (isSmall ? 'clave' : 'todas');   // todas | clave | ninguna
+  var timeCollapsed = !!saved.timeCollapsed;
+
+  /* La ventana se mide contra el intervalo del elemento seleccionado.
+     Los nodos sin fecha (lugares) permanecen siempre: son el tejido conectivo. */
+  function inWindow(n) {
+    if (n === selected) return true;
+    if (n.y0 === null || !selected || selected.y0 === null) return true;
+    var lo = Math.min(selected.y0, selected.y1) - years;
+    var hi = Math.max(selected.y0, selected.y1) + years;
+    return Math.max(n.y0, n.y1) >= lo && Math.min(n.y0, n.y1) <= hi;
+  }
+
+  function visible(n) { return (activeGroups[n.g] && inWindow(n)) || n === selected; }
 
   function isNeighbor(n) {
     if (!selected || n === selected) return false;
@@ -201,19 +463,32 @@
     return false;
   }
 
+  function relWith(n) {
+    if (!selected) return null;
+    for (var i = 0; i < selected.nbrs.length; i++) {
+      if (selected.nbrs[i].id === n.id) {
+        var nb = selected.nbrs[i];
+        return nb.dir === 'out' ? nb.rel : '← ' + nb.rel;
+      }
+    }
+    return null;
+  }
+
   function applyStyles() {
     NODES.forEach(function (n) {
       var vis = visible(n);
-      n.mesh.visible = vis;
+      n.mesh.visible = vis; n.glow.visible = vis;
       if (!vis) return;
       var dim = selected && n !== selected && !isNeighbor(n);
-      n.mat.opacity = dim ? 0.22 : 1;
+      n.mat.opacity = dim ? 0.55 : 1;
+      n.glowMat.opacity = dim ? 0.28 : (n === selected ? 0.95 : (n === hovered ? 0.75 : 0.5));
       n.mat.color.copy(n.baseColor);
-      if (n === selected) n.mat.color.offsetHSL(0, 0, 0.22);
-      var s = n.radius * (n === selected ? 1.55 : (n === hovered ? 1.25 : 1));
+      n.mat.emissive.copy(n.baseColor).multiplyScalar(n === selected ? 0.62 : 0.3);
+      var s = n.radius * (n === selected ? 1.6 : (n === hovered ? 1.25 : 1));
       n.mesh.scale.setScalar(s);
+      n.glow.scale.setScalar(s * 5.5);
     });
-    rebuildLines();
+    rebuildArcs();
   }
 
   /* ============================================================
@@ -234,7 +509,7 @@
   });
 
   var KEY_DEG = 6;
-  var _v = new THREE.Vector3();
+  var _v = new THREE.Vector3(), _c = new THREE.Vector3();
 
   function updateLabels(w, h) {
     for (var i = 0; i < NODES.length; i++) {
@@ -245,6 +520,11 @@
         else if (labelMode === 'clave') show = (n === selected || n === hovered || isNeighbor(n) || n.deg >= KEY_DEG);
         if (selected && !(n === selected || isNeighbor(n)) && labelMode !== 'todas') show = false;
       }
+      /* cara oculta del globo: fuera */
+      if (show) {
+        _c.copy(camera.position).sub(n.pos);
+        if (n.dir.dot(_c.normalize()) < 0.06) show = false;
+      }
       if (!show) { if (el.style.display !== 'none') el.style.display = 'none'; continue; }
 
       _v.copy(n.pos).project(camera);
@@ -252,7 +532,7 @@
 
       var x = (_v.x * 0.5 + 0.5) * w, y = (-_v.y * 0.5 + 0.5) * h;
       var dist = camera.position.distanceTo(n.pos);
-      var op = dist > 190 ? 0 : dist > 130 ? 0.35 : 1;
+      var op = dist > 230 ? 0 : dist > 165 ? 0.4 : 1;
       if (selected && (n === selected || isNeighbor(n))) op = 1;
       if (op === 0) { el.style.display = 'none'; continue; }
 
@@ -264,29 +544,25 @@
   }
 
   /* ============================================================
-     6. Controles de órbita (ratón + táctil)
+     6. Órbita alrededor del globo (ratón + táctil + teclado)
      ============================================================ */
-  var target = new THREE.Vector3(0, 0, 0);
-  var sph = { r: 165, theta: 0.7, phi: 1.15 };
-  var goal = { r: sph.r, theta: sph.theta, phi: sph.phi };
-  var goalTarget = target.clone();
+  var R_MIN = 84, R_MAX = 330, R_HOME = 168, R_FOCUS = 112;
+  var sph = { r: R_HOME + 60, theta: 0.6, phi: 1.1 };
+  var goal = { r: R_HOME, theta: 0.6, phi: 1.1 };
   var autoSpin = true;
 
-  function clampPhi(p) { return Math.max(0.12, Math.min(Math.PI - 0.12, p)); }
+  function clampPhi(p) { return Math.max(0.16, Math.min(Math.PI - 0.16, p)); }
+  function clampR(r) { return Math.max(R_MIN, Math.min(R_MAX, r)); }
 
   function updateCamera() {
-    sph.r += (goal.r - sph.r) * 0.12;
-    sph.theta += (goal.theta - sph.theta) * 0.14;
-    sph.phi += (goal.phi - sph.phi) * 0.14;
-    target.lerp(goalTarget, 0.1);
+    sph.r += (goal.r - sph.r) * 0.09;
+    sph.theta += (goal.theta - sph.theta) * 0.11;
+    sph.phi += (goal.phi - sph.phi) * 0.11;
     var sp = Math.sin(sph.phi);
-    camera.position.set(
-      target.x + sph.r * sp * Math.sin(sph.theta),
-      target.y + sph.r * Math.cos(sph.phi),
-      target.z + sph.r * sp * Math.cos(sph.theta)
-    );
-    camera.lookAt(target);
-    keyLight.position.copy(camera.position);
+    camera.position.set(sph.r * sp * Math.sin(sph.theta), sph.r * Math.cos(sph.phi), sph.r * sp * Math.cos(sph.theta));
+    camera.lookAt(0, 0, 0);
+    keyLight.position.copy(camera.position).multiplyScalar(0.6);
+    keyLight.position.y += 60;
   }
 
   var pointers = {}, lastPinch = 0, dragging = false, moved = 0, downAt = 0, downPos = null;
@@ -300,8 +576,8 @@
     pointers[ev.pointerId] = { x: ev.clientX, y: ev.clientY };
     dragging = true; moved = 0; downAt = Date.now();
     downPos = { x: ev.clientX, y: ev.clientY };
-    autoSpin = false;
-    lastPinch = 0;
+    autoSpin = false; lastPinch = 0;
+    hideHint();
   });
 
   el.addEventListener('pointermove', function (ev) {
@@ -315,11 +591,12 @@
     if (ids.length >= 2) {
       var a = pointers[ids[0]], b = pointers[ids[1]];
       var dist = Math.hypot(a.x - b.x, a.y - b.y);
-      if (lastPinch) goal.r = Math.max(38, Math.min(340, goal.r * (lastPinch / dist)));
+      if (lastPinch) goal.r = clampR(goal.r * (lastPinch / dist));
       lastPinch = dist;
     } else {
-      goal.theta -= dx * 0.005;
-      goal.phi = clampPhi(goal.phi - dy * 0.005);
+      flight = null;
+      goal.theta -= dx * 0.0052;
+      goal.phi = clampPhi(goal.phi - dy * 0.0052);
     }
   });
 
@@ -336,15 +613,36 @@
 
   el.addEventListener('wheel', function (ev) {
     ev.preventDefault();
-    autoSpin = false;
-    goal.r = Math.max(38, Math.min(340, goal.r * (1 + Math.sign(ev.deltaY) * 0.11)));
+    autoSpin = false; hideHint();
+    goal.r = clampR(goal.r * (1 + Math.sign(ev.deltaY) * 0.1));
   }, { passive: false });
+
+  document.addEventListener('keydown', function (ev) {
+    if (ev.target && /^(INPUT|TEXTAREA)$/.test(ev.target.tagName)) return;
+    var k = ev.key;
+    if (k === 'Escape') { closePanel(); return; }
+    if (k === 'ArrowLeft') { goal.theta += 0.16; autoSpin = false; flight = null; }
+    else if (k === 'ArrowRight') { goal.theta -= 0.16; autoSpin = false; flight = null; }
+    else if (k === 'ArrowUp') { goal.phi = clampPhi(goal.phi - 0.12); autoSpin = false; flight = null; }
+    else if (k === 'ArrowDown') { goal.phi = clampPhi(goal.phi + 0.12); autoSpin = false; flight = null; }
+    else if (k === '+' || k === '=') goal.r = clampR(goal.r * 0.88);
+    else if (k === '-' || k === '_') goal.r = clampR(goal.r * 1.12);
+    else return;
+    ev.preventDefault();
+    hideHint();
+  });
 
   /* ============================================================
      7. Selección por raycasting
      ============================================================ */
   var raycaster = new THREE.Raycaster();
   var ndc = new THREE.Vector2();
+  var _f = new THREE.Vector3();
+
+  function facing(n) {
+    _f.copy(camera.position).sub(n.pos).normalize();
+    return n.dir.dot(_f) > 0;
+  }
 
   function nodeAt(cx, cy) {
     var r = el.getBoundingClientRect();
@@ -352,14 +650,14 @@
     ndc.y = -((cy - r.top) / r.height) * 2 + 1;
     raycaster.setFromCamera(ndc, camera);
     var meshes = [];
-    for (var i = 0; i < NODES.length; i++) if (visible(NODES[i])) meshes.push(NODES[i].mesh);
+    for (var i = 0; i < NODES.length; i++) if (visible(NODES[i]) && facing(NODES[i])) meshes.push(NODES[i].mesh);
     var hits = raycaster.intersectObjects(meshes, false);
     return hits.length ? hits[0].object.userData.node : null;
   }
 
   function pickAt(x, y) {
     var n = nodeAt(x, y);
-    if (n) select(n, true); else clearSelection();
+    if (n) select(n, true); else closePanel();
   }
 
   function hoverAt(ev) {
@@ -372,19 +670,18 @@
   }
 
   /* ============================================================
-     8. Vuelo de cámara
+     8. Giro del globo hacia un nodo
      ============================================================ */
   var flight = null;
   function easeInOut(t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
 
   function flyTo(node) {
-    var toTheta = Math.atan2(node.pos.x, node.pos.z) + 0.55;
-    var len = node.pos.length() || 1;
-    var toPhi = clampPhi(Math.acos(Math.max(-1, Math.min(1, node.pos.y / len))) + 0.12);
+    var toPhi = clampPhi(Math.acos(Math.max(-1, Math.min(1, node.dir.y))));
+    var toTheta = Math.atan2(node.dir.x, node.dir.z);
     flight = {
-      t0: performance.now(), dur: 950,
-      from: { theta: goal.theta, phi: goal.phi, r: goal.r, tgt: goalTarget.clone() },
-      to: { theta: toTheta, phi: toPhi, r: 62, tgt: node.pos.clone() }
+      t0: performance.now(), dur: 900,
+      from: { theta: goal.theta, phi: goal.phi, r: goal.r },
+      to: { theta: toTheta, phi: toPhi, r: Math.min(goal.r, R_FOCUS) }
     };
   }
 
@@ -392,22 +689,21 @@
     if (!flight) return;
     var k = Math.min(1, (now - flight.t0) / flight.dur), e = easeInOut(k);
     var f = flight.from, t = flight.to;
-    var dth = ((t.theta - f.theta + Math.PI) % (Math.PI * 2)) - Math.PI;
+    var dth = ((t.theta - f.theta + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI;
     goal.theta = f.theta + dth * e;
     goal.phi = f.phi + (t.phi - f.phi) * e;
     goal.r = f.r + (t.r - f.r) * e;
-    goalTarget.copy(f.tgt).lerp(t.tgt, e);
     if (k >= 1) flight = null;
   }
 
   /* ============================================================
-     9. Panel flotante
+     9. Ficha del nodo
      ============================================================ */
   var panel = document.getElementById('g-panel');
   var panelBody = document.getElementById('g-panel-body');
 
-  function wikiURL(title) { return 'https://es.wikipedia.org/wiki/' + encodeURIComponent(title.replace(/ /g, '_')); }
-  function sourceURL(title) { return 'https://es.wikisource.org/wiki/' + encodeURIComponent(title.replace(/ /g, '_')); }
+  function wikiURL(t) { return 'https://es.wikipedia.org/wiki/' + encodeURIComponent(t.replace(/ /g, '_')); }
+  function sourceURL(t) { return 'https://es.wikisource.org/wiki/' + encodeURIComponent(t.replace(/ /g, '_')); }
 
   function el2(tag, cls, text) {
     var e = document.createElement(tag);
@@ -416,12 +712,13 @@
     return e;
   }
 
+  function singular(g) { return GROUPS[g].label.replace(/s$/, ''); }
+
   function renderPanel(n) {
     panelBody.innerHTML = '';
 
     var head = el2('div', 'g-panel-head');
-    var pill = el2('span', 'g-pill g-' + n.g, GROUPS[n.g].label.replace(/s$/, ''));
-    head.appendChild(pill);
+    head.appendChild(el2('span', 'g-pill g-' + n.g, singular(n.g)));
     if (n.d && n.d !== '—') head.appendChild(el2('span', 'g-dates', n.d));
     panelBody.appendChild(head);
 
@@ -448,12 +745,11 @@
       var b = el2('button', 'g-travel-item');
       b.type = 'button';
       if (!visible(t)) b.classList.add('is-off');
-      var dot = el2('span', 'g-dot g-' + t.g);
+      b.appendChild(el2('span', 'g-dot g-' + t.g));
       var txt = el2('span', 'g-travel-txt');
       txt.appendChild(el2('strong', null, t.n));
-      var relTxt = nb.dir === 'out' ? nb.rel : '← ' + nb.rel;
-      txt.appendChild(el2('em', null, relTxt));
-      b.appendChild(dot); b.appendChild(txt);
+      txt.appendChild(el2('em', null, (nb.dir === 'out' ? '' : '← ') + nb.rel));
+      b.appendChild(txt);
       b.addEventListener('click', function () {
         if (!visible(t)) { activeGroups[t.g] = true; syncGroupUI(); }
         select(t, true);
@@ -462,20 +758,16 @@
     });
     panelBody.appendChild(list);
 
-    panelBody.appendChild(el2('h4', 'g-sub', 'Grupos activos'));
-    panelBody.appendChild(buildGroupChips('panel'));
-
     panel.classList.add('is-open');
   }
 
-  function buildGroupChips(scopeName) {
+  function buildGroupChips() {
     var wrap = el2('div', 'g-chips');
     Object.keys(GROUPS).forEach(function (g) {
       var count = NODES.filter(function (n) { return n.g === g; }).length;
       var b = el2('button', 'g-chip g-' + g);
       b.type = 'button';
       b.dataset.group = g;
-      b.dataset.scope = scopeName;
       b.setAttribute('aria-pressed', String(activeGroups[g]));
       b.appendChild(el2('span', 'g-dot g-' + g));
       b.appendChild(el2('span', null, GROUPS[g].label));
@@ -488,9 +780,8 @@
 
   function toggleGroup(g) {
     var on = Object.keys(activeGroups).filter(function (k) { return activeGroups[k]; });
-    if (activeGroups[g] && on.length === 1) return;   // nunca dejar el grafo vacío
+    if (activeGroups[g] && on.length === 1) return;   // nunca dejar el globo vacío
     activeGroups[g] = !activeGroups[g];
-    if (selected && !visible(selected)) clearSelection();
     syncGroupUI();
   }
 
@@ -498,35 +789,220 @@
     document.querySelectorAll('.g-chip').forEach(function (b) {
       b.setAttribute('aria-pressed', String(activeGroups[b.dataset.group]));
     });
-    document.querySelectorAll('.g-travel-item').forEach(function () { /* refrescado al reabrir */ });
-    applyStyles();
-    if (selected) renderPanel(selected);
+    refresh();
   }
+
+  /* Recalcula todo lo que depende de la selección, los grupos o la ventana */
+  function refresh() {
+    applyStyles();
+    if (panelOpen && selected) renderPanel(selected);
+    renderTime();
+    syncWindowUI();
+    save();
+  }
+
+  var panelOpen = false;
 
   function select(n, fly) {
     selected = n;
-    applyStyles();
-    renderPanel(n);
-    if (fly) flyTo(n);
+    panelOpen = true;
     autoSpin = false;
+    hideHint();
+    if (fly) flyTo(n);
+    focusTimeTypes(n);        // ajusta los tipos de la cronología
+    refresh();                // renderiza la ficha, el globo y la cronología
   }
 
-  function clearSelection() {
-    selected = null;
+  function closePanel() {
+    panelOpen = false;
     panel.classList.remove('is-open');
-    applyStyles();
   }
 
-  document.getElementById('g-close').addEventListener('click', clearSelection);
-  document.addEventListener('keydown', function (ev) {
-    if (ev.key === 'Escape') clearSelection();
-  });
+  document.getElementById('g-close').addEventListener('click', closePanel);
 
   /* ============================================================
-     10. Barra de herramientas
+     10. Cronología (filtrable por tipo, sincronizada con la selección)
      ============================================================ */
-  var toolbar = document.getElementById('g-toolbar');
-  toolbar.appendChild(buildGroupChips('toolbar'));
+  var timeTypes = {};
+  var TIME_DEFAULT = { persona: true, obra: false, idea: false, evento: true, lugar: false };
+  Object.keys(GROUPS).forEach(function (g) {
+    timeTypes[g] = saved.timeTypes && typeof saved.timeTypes[g] === 'boolean'
+      ? saved.timeTypes[g] : !!TIME_DEFAULT[g];
+  });
+  if (!Object.keys(timeTypes).some(function (g) { return timeTypes[g]; })) {
+    Object.keys(timeTypes).forEach(function (g) { timeTypes[g] = !!TIME_DEFAULT[g]; });
+  }
+  var timeUserSet = !!saved.timeUserSet;
+
+  var tTypes = document.getElementById('t-types');
+  var tTrack = document.getElementById('t-track');
+  var tContext = document.getElementById('t-context');
+  var tMin = document.getElementById('t-min');
+  var tMax = document.getElementById('t-max');
+
+  Object.keys(GROUPS).forEach(function (g) {
+    var b = el2('button', 't-type g-' + g);
+    b.type = 'button';
+    b.dataset.group = g;
+    b.appendChild(el2('span', 'g-dot g-' + g));
+    b.appendChild(el2('span', null, GROUPS[g].label));
+    b.appendChild(el2('span', 't-type-n', String(NODES.filter(function (n) { return n.g === g; }).length)));
+    b.addEventListener('click', function () {
+      var on = Object.keys(timeTypes).filter(function (k) { return timeTypes[k]; });
+      if (timeTypes[g] && on.length === 1) return;      // al menos un tipo
+      timeTypes[g] = !timeTypes[g];
+      timeUserSet = true;
+      if (timeTypes[g] && !activeGroups[g]) { activeGroups[g] = true; syncGroupUI(); return; }
+      refresh();
+    });
+    tTypes.appendChild(b);
+  });
+
+  function syncTypeChips() {
+    tTypes.querySelectorAll('.t-type').forEach(function (b) {
+      b.setAttribute('aria-pressed', String(timeTypes[b.dataset.group]));
+    });
+  }
+
+  /* al seleccionar: por defecto la cronología de su mismo tipo */
+  function focusTimeTypes(n) {
+    if (!timeUserSet) {
+      Object.keys(timeTypes).forEach(function (g) { timeTypes[g] = (g === n.g); });
+    } else if (!timeTypes[n.g]) {
+      timeTypes[n.g] = true;
+    }
+  }
+
+  function timeItems() {
+    return NODES.filter(function (n) { return timeTypes[n.g] && visible(n); })
+      .sort(function (a, b) {
+        if (a.y0 === null && b.y0 === null) return a.n.localeCompare(b.n, 'es');
+        if (a.y0 === null) return 1;
+        if (b.y0 === null) return -1;
+        return a.y0 - b.y0 || (a.y1 - b.y1);
+      });
+  }
+
+  function renderTime() {
+    syncTypeChips();
+    var items = timeItems();
+    var labels = Object.keys(GROUPS).filter(function (g) { return timeTypes[g]; })
+      .map(function (g) { return GROUPS[g].label.toLowerCase(); }).join(' + ');
+    var win = (selected && selected.y0 !== null) ? ' · ±' + years + ' años' : '';
+    tContext.textContent = (selected ? selected.n + ' · ' : '') + labels + ' (' + items.length + ')' + win;
+
+    var dated = items.filter(function (n) { return n.y0 !== null; });
+    tMin.textContent = dated.length ? dated[0].d : '';
+    tMax.textContent = dated.length ? dated[dated.length - 1].d : '';
+
+    tTrack.innerHTML = '';
+    if (!items.length) {
+      tTrack.appendChild(el2('p', 't-empty', 'Ningún elemento con los tipos activos.'));
+      return;
+    }
+
+    var selCard = null;
+    items.forEach(function (n) {
+      var b = el2('button', 't-card g-' + n.g);
+      b.type = 'button';
+      var rel = relWith(n);
+      if (n === selected) { b.classList.add('is-selected'); selCard = b; }
+      else if (rel) b.classList.add('is-linked');
+      b.appendChild(el2('span', 't-year', n.d && n.d !== '—' ? n.d : 'sin fecha'));
+      b.appendChild(el2('span', 't-name', n.n));
+      b.appendChild(el2('span', 't-rel', n === selected ? 'en el centro del grafo' : (rel || singular(n.g))));
+      b.addEventListener('click', function () { select(n, true); });
+      tTrack.appendChild(b);
+    });
+
+    if (selCard) {
+      tTrack.scrollLeft = Math.max(0, selCard.offsetLeft - tTrack.clientWidth / 2 + selCard.offsetWidth / 2);
+    } else {
+      tTrack.scrollLeft = 0;
+    }
+  }
+
+  var tToggle = document.getElementById('t-toggle');
+  var timeBox = document.getElementById('g-time');
+
+  function syncTimeCollapsed() {
+    timeBox.classList.toggle('is-collapsed', timeCollapsed);
+    tToggle.textContent = timeCollapsed ? 'Mostrar' : 'Ocultar';
+    tToggle.setAttribute('aria-expanded', String(!timeCollapsed));
+    if (timeCollapsed) document.documentElement.style.setProperty('--time-h', '44px');
+    else document.documentElement.style.removeProperty('--time-h');
+  }
+  tToggle.addEventListener('click', function () {
+    timeCollapsed = !timeCollapsed;
+    syncTimeCollapsed();
+    save();
+  });
+  syncTimeCollapsed();
+
+  /* ============================================================
+     10 bis. Ventana temporal alrededor del elemento seleccionado
+     ============================================================ */
+  var yearsInput = document.getElementById('g-years');
+  var rangeInput = document.getElementById('g-range');
+  var countOut = document.getElementById('g-count');
+  var spanOut = document.getElementById('g-span');
+
+  var S_MIN = 50, S_MAX = 100000, S_RATIO = S_MAX / S_MIN;
+
+  function sliderToYears(v) {
+    var y = S_MIN * Math.pow(S_RATIO, v / 100);
+    if (y < 100) return Math.round(y / 5) * 5;
+    if (y < 1000) return Math.round(y / 10) * 10;
+    if (y < 10000) return Math.round(y / 100) * 100;
+    return Math.round(y / 500) * 500;
+  }
+  function yearsToSlider(y) {
+    var v = 100 * Math.log(Math.max(1, y) / S_MIN) / Math.log(S_RATIO);
+    return Math.max(0, Math.min(100, Math.round(v)));
+  }
+  function fmtYear(y) {
+    return y < 0 ? Math.abs(y) + ' a. C.' : (y === 0 ? '0' : y + ' d. C.');
+  }
+
+  function setYears(v, fromSlider) {
+    var y = Math.round(v);
+    if (!isFinite(y) || y < YEARS_MIN) y = YEARS_MIN;
+    if (y > YEARS_MAX) y = YEARS_MAX;
+    years = y;
+    yearsInput.value = String(years);
+    if (!fromSlider) rangeInput.value = String(yearsToSlider(years));
+    refresh();
+  }
+
+  function syncWindowUI() {
+    var vis = NODES.filter(visible).length;
+    countOut.textContent = vis + ' de ' + NODES.length + ' nodos';
+    if (selected && selected.y0 !== null) {
+      var lo = Math.min(selected.y0, selected.y1) - years;
+      var hi = Math.max(selected.y0, selected.y1) + years;
+      spanOut.textContent = fmtYear(lo) + ' → ' + fmtYear(hi);
+    } else {
+      spanOut.textContent = 'sin fecha: todo el canon';
+    }
+  }
+
+  rangeInput.addEventListener('input', function () {
+    setYears(sliderToYears(parseInt(rangeInput.value, 10) || 0), true);
+  });
+  yearsInput.addEventListener('change', function () {
+    setYears(parseInt(yearsInput.value, 10) || DEFAULT_YEARS, false);
+  });
+  yearsInput.addEventListener('keydown', function (ev) {
+    if (ev.key === 'Enter') { ev.preventDefault(); yearsInput.blur(); }
+  });
+
+  yearsInput.value = String(years);
+  rangeInput.value = String(yearsToSlider(years));
+
+  /* ============================================================
+     11. Barra superior
+     ============================================================ */
+  document.getElementById('g-chipbox').appendChild(buildGroupChips());
 
   var search = document.getElementById('g-search');
   var results = document.getElementById('g-results');
@@ -564,15 +1040,21 @@
   labelBtn.addEventListener('click', function () {
     labelMode = LABEL_ORDER[(LABEL_ORDER.indexOf(labelMode) + 1) % 3];
     syncLabelBtn();
+    save();
   });
   syncLabelBtn();
 
   document.getElementById('g-reset').addEventListener('click', function () {
-    clearSelection();
+    closePanel();
     Object.keys(activeGroups).forEach(function (g) { activeGroups[g] = true; });
-    goal.r = 165; goal.theta = 0.7; goal.phi = 1.15;
-    goalTarget.set(0, 0, 0);
-    flight = null; autoSpin = true;
+    Object.keys(timeTypes).forEach(function (g) { timeTypes[g] = !!TIME_DEFAULT[g]; });
+    timeUserSet = false;
+    selected = byId[DEFAULT_ID] || NODES[0];
+    labelMode = isSmall ? 'clave' : 'todas';
+    syncLabelBtn();
+    setYears(DEFAULT_YEARS, false);
+    goal.r = R_HOME; flight = null; autoSpin = true;
+    flyTo(selected);
     syncGroupUI();
   });
 
@@ -587,8 +1069,41 @@
     resize();
   });
 
+  var hint = document.getElementById('g-hint');
+  var hintGone = false;
+  function hideHint() {
+    if (hintGone || !hint) return;
+    hintGone = true;
+    hint.classList.add('is-gone');
+    setTimeout(function () { if (hint.parentNode) hint.parentNode.removeChild(hint); }, 600);
+  }
+  setTimeout(hideHint, 9000);
+
   /* ============================================================
-     11. Bucle
+     12. Brújula de orientación
+     ============================================================ */
+  var cDot = document.getElementById('c-dot');
+  var cRead = document.getElementById('c-read');
+
+  function updateCompass() {
+    if (!cDot) return;
+    var sp = Math.sin(sph.phi);
+    var x = 32 + 24 * sp * Math.sin(sph.theta);
+    var y = 32 - 24 * Math.cos(sph.phi);
+    var front = sp * Math.cos(sph.theta);
+    cDot.setAttribute('cx', x.toFixed(1));
+    cDot.setAttribute('cy', y.toFixed(1));
+    cDot.setAttribute('r', front >= 0 ? '3.4' : '2.2');
+    cDot.style.opacity = front >= 0 ? '1' : '.45';
+
+    var lat = 90 - sph.phi * 180 / Math.PI;
+    var lon = ((sph.theta * 180 / Math.PI) % 360 + 540) % 360 - 180;
+    cRead.textContent = Math.abs(lat).toFixed(0) + '° ' + (lat >= 0 ? 'N' : 'S') + ' · ' +
+      Math.abs(lon).toFixed(0) + '° ' + (lon >= 0 ? 'E' : 'O');
+  }
+
+  /* ============================================================
+     13. Bucle
      ============================================================ */
   var W = 0, H = 0;
   function resize() {
@@ -604,19 +1119,27 @@
 
   var running = true;
   if (window.IntersectionObserver) {
-    new IntersectionObserver(function (entries) {
-      running = entries[0].isIntersecting;
-    }, { threshold: 0.01 }).observe(mount);
+    new IntersectionObserver(function (entries) { running = entries[0].isIntersecting; },
+      { threshold: 0.01 }).observe(mount);
   }
 
-  applyStyles();
+  /* estado inicial: siempre hay un elemento seleccionado (el último del usuario) */
+  if (!saved.timeTypes) focusTimeTypes(selected);   // primera visita: su mismo tipo
+  refresh();
+  flyTo(selected);
+  if (!isSmall) { panelOpen = true; renderPanel(selected); }
 
   function loop(now) {
     requestAnimationFrame(loop);
     if (!running) return;
     stepFlight(now);
-    if (autoSpin && !dragging && !flight) goal.theta += 0.00075;
+    if (autoSpin && !dragging && !flight) goal.theta += 0.0005;
+    if (selected && selected.glow.visible) {
+      var pulse = 1 + Math.sin(now * 0.0035) * 0.12;
+      selected.glow.scale.setScalar(selected.radius * 1.6 * 5.5 * pulse);
+    }
     updateCamera();
+    updateCompass();
     renderer.render(scene, camera);
     updateLabels(W, H);
   }

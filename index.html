@@ -3,534 +3,399 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<meta name="theme-color" content="#07111f" />
-<meta name="description" content="El Canon de Occidente: plataforma semántica que conecta personas, obras, ideas, eventos y lugares en un grafo navegable." />
+<meta name="theme-color" content="#050b16" />
+<meta name="description" content="El Canon de Occidente: un globo semántico que conecta personas, obras, ideas, eventos y lugares en un grafo 3D navegable." />
 <title>El Canon de Occidente</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%2307111f'/><circle cx='50' cy='50' r='20' fill='none' stroke='%236ea8fe' stroke-width='7'/></svg>" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%23050b16'/><circle cx='50' cy='50' r='26' fill='none' stroke='%236ea8fe' stroke-width='6'/><ellipse cx='50' cy='50' rx='26' ry='10' fill='none' stroke='%23b28cff' stroke-width='4'/></svg>" />
 <style>
   :root{
     color-scheme: dark;
-    --bg:#07111f; --panel:#101b2d; --text:#f5f7fb; --muted:#94aac8;
-    --accent:#6ea8fe; --accent-2:#b28cff; --line:rgba(255,255,255,.08);
-    --radius:16px; --pad:clamp(16px,4vw,32px);
+    --bg:#050b16; --panel:rgba(11,20,36,.94); --text:#f2f6ff; --muted:#8fa6c8;
+    --accent:#6ea8fe; --accent-2:#b28cff; --line:rgba(255,255,255,.09);
+    --radius:14px;
   }
   *,*::before,*::after{ box-sizing:border-box; }
-  html{ -webkit-text-size-adjust:100%; scroll-behavior:smooth; }
+  html,body{ height:100%; }
   body{
-    margin:0; background:var(--bg); color:var(--text);
+    margin:0; background:var(--bg); color:var(--text); overflow:hidden;
     font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
-    line-height:1.55; -webkit-font-smoothing:antialiased;
-    overflow-x:hidden;
+    line-height:1.5; -webkit-font-smoothing:antialiased;
   }
-  img,svg{ max-width:100%; height:auto; }
   a{ color:inherit; text-decoration:none; -webkit-tap-highlight-color:transparent; }
-  h1,h2,h3{ line-height:1.2; text-wrap:balance; }
-  ul{ padding-left:1.1em; margin:.4em 0; }
-  :focus-visible{ outline:2px solid var(--accent); outline-offset:3px; border-radius:6px; }
+  button{ font:inherit; }
+  :focus-visible{ outline:2px solid var(--accent); outline-offset:2px; border-radius:8px; }
 
-  /* ---------- Header ---------- */
-  .topbar{
-    position:sticky; top:0; z-index:20;
-    display:flex; align-items:center; justify-content:space-between; gap:12px;
-    padding:12px var(--pad); padding-top:calc(12px + env(safe-area-inset-top));
-    background:rgba(7,17,31,.85); backdrop-filter:blur(10px);
-    border-bottom:1px solid var(--line);
-  }
-  .brand{ font-weight:700; letter-spacing:.01em; font-size:clamp(1rem,3.4vw,1.15rem); white-space:nowrap; }
-  .nav-toggle{
-    display:none; background:rgba(255,255,255,.08); color:var(--text);
-    border:1px solid var(--line); border-radius:10px;
-    width:44px; height:44px; font-size:1.25rem; cursor:pointer; flex:0 0 auto;
-  }
-  nav{ display:flex; gap:clamp(10px,2vw,20px); color:var(--muted); font-size:.95rem; }
-  nav a{ padding:8px 4px; }
-  nav a:hover,nav a:focus-visible{ color:var(--text); }
-
-  /* ---------- Layout ---------- */
-  main{ padding:0 var(--pad) calc(48px + env(safe-area-inset-bottom)); max-width:1200px; margin-inline:auto; }
-  .section{ margin-top:clamp(32px,7vw,56px); }
-  .section-title{ margin-bottom:16px; }
-  .section-title h2{ margin:0 0 6px; font-size:clamp(1.35rem,4.5vw,1.9rem); }
-  .section-title p{ margin:0; color:var(--muted); }
-
-  .hero{
-    display:grid; grid-template-columns:minmax(0,2fr) minmax(0,1fr);
-    gap:clamp(20px,4vw,32px); padding:clamp(28px,7vw,52px) 0 clamp(8px,2vw,16px);
-    align-items:start;
-  }
-  .hero-copy h1{ font-size:clamp(1.8rem,6.5vw,3rem); margin:8px 0 12px; }
-  .hero-copy > p:not(.eyebrow){ color:var(--muted); font-size:clamp(1rem,2.6vw,1.1rem); margin:0; max-width:60ch; }
-  .eyebrow{ text-transform:uppercase; color:var(--accent); letter-spacing:.18em; font-size:clamp(.7rem,2.4vw,.8rem); margin:0; }
-
-  .hero-card,.panel,.graph-card{
-    background:var(--panel); border:1px solid var(--line);
-    border-radius:var(--radius); padding:clamp(16px,3.5vw,22px);
-  }
-  .hero-card h3{ margin:0 0 8px; }
-  .hero-card p{ margin:0 0 8px; color:var(--muted); }
-  .hero-card li{ color:var(--muted); }
-
-  .hero-actions{ display:flex; flex-wrap:wrap; gap:12px; margin-top:20px; }
-  .btn{
-    display:inline-flex; align-items:center; justify-content:center;
-    min-height:44px; padding:10px 18px; border-radius:999px;
-    font-weight:600; transition:transform .15s ease, filter .15s ease;
-  }
-  .btn:active{ transform:scale(.97); }
-  .btn.primary{ background:var(--accent); color:#04111f; }
-  .btn.secondary{ background:rgba(255,255,255,.08); border:1px solid var(--line); }
-
-  /* ---------- Cards ---------- */
-  .cards{ display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:16px; }
-  .card{
-    background:var(--panel); border:1px solid var(--line); border-radius:var(--radius);
-    padding:18px; cursor:pointer; text-align:left; color:inherit; font:inherit;
-    transition:border-color .15s ease, transform .15s ease;
-  }
-  .card:hover,.card:focus-visible{ border-color:var(--accent); }
-  .card:active{ transform:scale(.99); }
-  .card[aria-pressed="true"]{ border-color:var(--accent); background:rgba(110,168,254,.1); }
-  .card h3{ margin:0 0 6px; font-size:1.1rem; }
-  .card .card-type{ margin:0 0 8px; color:var(--accent-2); font-size:.9rem; }
-  .card .card-summary{ margin:0; color:var(--muted); font-size:.95rem; }
-
-  .two-col{ display:grid; grid-template-columns:minmax(0,1.2fr) minmax(0,.8fr); gap:16px; align-items:start; }
-  .panel h3{ margin:0 0 8px; font-size:clamp(1.15rem,4vw,1.4rem); }
-  .panel p{ color:var(--muted); }
-  .pill{
-    display:inline-block; padding:6px 12px; border-radius:999px;
-    background:rgba(178,140,255,.15); color:#cdbdff; font-size:.85rem; margin:0 0 10px;
-  }
-  .meta-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; margin:16px 0; }
-  .meta-grid strong{ font-size:.85rem; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; }
-  .meta-grid p{ margin:4px 0 0; color:var(--text); }
-  #entity-sources li,#entity-connections li{ color:var(--muted); margin:4px 0; }
-
-  /* ---------- Grafo 3D ---------- */
+  /* colores por grupo */
   .g-persona{ --gc:#6ea8fe; } .g-obra{ --gc:#b28cff; } .g-idea{ --gc:#4ade80; }
   .g-evento{ --gc:#fb923c; } .g-lugar{ --gc:#22d3ee; }
 
-  #g-stage{
-    position:relative; background:#07111f; border:1px solid var(--line);
-    border-radius:var(--radius); overflow:hidden;
-  }
-  #g-stage:fullscreen{ border-radius:0; border:none; }
-  #graph3d{
-    position:relative; width:100%;
-    height:clamp(420px,68vh,760px); touch-action:none; cursor:grab;
-  }
-  #g-stage:fullscreen #graph3d{ height:100vh; }
+  /* ---------- Escenario ---------- */
+  #g-stage{ position:fixed; inset:0; overflow:hidden; background:var(--bg); }
+  #graph3d{ position:absolute; inset:0; touch-action:none; cursor:grab; }
   #graph3d canvas{ display:block; width:100%; height:100%; }
-  .g-fallback{ display:grid; place-content:center; height:100%; text-align:center; color:var(--muted); padding:24px; }
+  .g-fallback{
+    position:absolute; inset:0; display:grid; place-content:center; gap:8px;
+    text-align:center; color:var(--muted); padding:24px;
+  }
+  .g-fallback strong{ color:var(--text); font-size:1.1rem; }
 
   /* etiquetas proyectadas */
-  .g-labels{ position:absolute; inset:0; pointer-events:none; }
+  .g-labels{ position:absolute; inset:0; pointer-events:none; z-index:2; }
   .g-label{
-    position:absolute; top:0; left:0; pointer-events:auto;
-    background:rgba(7,17,31,.72); color:#e8eefb; border:1px solid rgba(255,255,255,.14);
-    border-left:3px solid var(--gc); border-radius:7px;
-    padding:3px 8px; font:600 11.5px/1.25 inherit; white-space:nowrap;
-    cursor:pointer; backdrop-filter:blur(3px); max-width:180px; overflow:hidden; text-overflow:ellipsis;
+    position:absolute; top:0; left:0; pointer-events:auto; will-change:transform;
+    background:rgba(5,11,22,.66); color:#e8eefb;
+    border:1px solid rgba(255,255,255,.12); border-left:3px solid var(--gc);
+    border-radius:7px; padding:3px 8px;
+    font-family:inherit; font-weight:600; font-size:11.5px; line-height:1.25;
+    white-space:nowrap; cursor:pointer; backdrop-filter:blur(3px);
+    max-width:190px; overflow:hidden; text-overflow:ellipsis;
   }
-  .g-label.is-selected{ background:var(--gc); color:#04111f; border-color:var(--gc); font-size:13px; z-index:3; }
+  .g-label:hover{ background:rgba(5,11,22,.92); border-color:var(--gc); }
+  .g-label.is-selected{
+    background:var(--gc); color:#04111f; border-color:var(--gc);
+    font-size:13px; z-index:3; box-shadow:0 0 22px -4px var(--gc);
+  }
 
-  /* barra superior del grafo */
+  /* ---------- Barra superior ---------- */
   .g-bar{
-    position:absolute; top:0; left:0; right:0; z-index:5;
+    position:absolute; top:0; left:0; right:0; z-index:6;
     display:flex; flex-wrap:wrap; gap:8px; align-items:center;
-    padding:10px; background:linear-gradient(rgba(7,17,31,.92),rgba(7,17,31,0));
+    padding:12px 14px; padding-top:calc(12px + env(safe-area-inset-top));
+    background:linear-gradient(rgba(5,11,22,.9),rgba(5,11,22,0));
     pointer-events:none;
   }
   .g-bar > *{ pointer-events:auto; }
-  .g-searchwrap{ position:relative; flex:1 1 180px; min-width:0; max-width:280px; }
+  .brand{
+    margin:0 auto 0 0; display:flex; align-items:center; gap:9px; font-weight:700;
+    font-size:clamp(.92rem,2.6vw,1.05rem); letter-spacing:.01em; white-space:nowrap;
+  }
+  .brand svg{ width:22px; height:22px; flex:0 0 auto; }
+  .g-searchwrap{ position:relative; flex:0 1 260px; min-width:150px; }
   #g-search{
     width:100%; min-height:38px; padding:8px 12px; border-radius:10px;
-    background:rgba(16,27,45,.92); border:1px solid var(--line); color:var(--text);
-    font:inherit; font-size:.9rem;
+    background:rgba(11,20,36,.88); border:1px solid var(--line); color:var(--text);
+    font:inherit; font-size:.9rem; backdrop-filter:blur(8px);
   }
   #g-search::placeholder{ color:var(--muted); }
   #g-results{
     display:none; position:absolute; top:calc(100% + 6px); left:0; right:0; z-index:8;
-    background:#101b2d; border:1px solid var(--line); border-radius:10px; overflow:hidden;
+    background:#0b1424; border:1px solid var(--line); border-radius:10px; overflow:hidden;
+    box-shadow:0 16px 40px rgba(0,0,0,.55);
   }
   #g-results.is-open{ display:block; }
   .g-result{
     display:flex; align-items:center; gap:8px; width:100%; min-height:40px;
     padding:8px 12px; background:none; border:none; border-bottom:1px solid var(--line);
-    color:var(--text); font:inherit; font-size:.9rem; text-align:left; cursor:pointer;
+    color:var(--text); font-size:.9rem; text-align:left; cursor:pointer;
   }
   .g-result:last-child{ border-bottom:none; }
   .g-result:hover,.g-result:focus-visible{ background:rgba(110,168,254,.14); }
 
   .g-btn{
     min-height:38px; padding:8px 12px; border-radius:10px; cursor:pointer;
-    background:rgba(16,27,45,.92); border:1px solid var(--line); color:var(--muted);
-    font:inherit; font-size:.82rem; white-space:nowrap;
+    background:rgba(11,20,36,.88); border:1px solid var(--line); color:var(--muted);
+    font-size:.82rem; white-space:nowrap; backdrop-filter:blur(8px);
+    transition:color .15s ease, border-color .15s ease;
   }
   .g-btn:hover,.g-btn:focus-visible{ color:var(--text); border-color:var(--accent); }
 
-  #g-toolbar{ position:absolute; left:0; right:0; bottom:0; z-index:5; padding:10px; pointer-events:none; }
+  /* ---------- Filtros de grupo ---------- */
+  #g-toolbar{
+    position:absolute; z-index:5; left:14px; top:66px;
+    max-width:min(calc(100% - 28px), 460px); pointer-events:none;
+  }
   #g-toolbar > *{ pointer-events:auto; }
   .g-chips{ display:flex; flex-wrap:wrap; gap:6px; }
   .g-chip{
-    display:inline-flex; align-items:center; gap:7px; min-height:36px;
-    padding:6px 11px; border-radius:999px; cursor:pointer;
-    background:rgba(16,27,45,.92); border:1px solid var(--line);
-    color:var(--muted); font:inherit; font-size:.8rem;
+    display:inline-flex; align-items:center; gap:7px; min-height:34px;
+    padding:5px 11px; border-radius:999px; cursor:pointer;
+    background:rgba(11,20,36,.88); border:1px solid var(--line);
+    color:var(--muted); font-size:.79rem; backdrop-filter:blur(8px);
+    transition:opacity .15s ease, border-color .15s ease, color .15s ease;
   }
-  .g-chip[aria-pressed="true"]{ color:var(--text); border-color:var(--gc); background:rgba(16,27,45,.98); }
-  .g-chip[aria-pressed="false"]{ opacity:.45; }
+  .g-chip[aria-pressed="true"]{ color:var(--text); border-color:var(--gc); }
+  .g-chip[aria-pressed="false"]{ opacity:.42; }
   .g-chip[aria-pressed="false"] .g-dot{ background:transparent; border:1px solid currentColor; }
-  .g-count{ color:var(--muted); font-size:.72rem; }
-  .g-dot{ width:9px; height:9px; border-radius:50%; background:var(--gc); flex:0 0 auto; }
+  .g-count{ color:var(--muted); font-size:.7rem; }
 
-  /* panel flotante */
+  /* ---------- Ventana temporal ---------- */
+  .g-window{
+    margin-top:8px; width:min(300px,100%); padding:9px 12px 10px; border-radius:12px;
+    background:rgba(11,20,36,.88); border:1px solid var(--line); backdrop-filter:blur(8px);
+  }
+  .w-row{ display:flex; align-items:center; gap:7px; }
+  .w-label{
+    font-size:.68rem; text-transform:uppercase; letter-spacing:.11em;
+    color:var(--muted); font-weight:700; white-space:nowrap;
+  }
+  #g-years{
+    width:82px; min-height:28px; padding:3px 8px; border-radius:8px; text-align:right;
+    background:rgba(255,255,255,.06); border:1px solid var(--line); color:var(--text);
+    font:inherit; font-size:.82rem; font-variant-numeric:tabular-nums;
+  }
+  .w-unit{ color:var(--muted); font-size:.74rem; margin-right:auto; }
+  #g-range{
+    width:100%; margin:8px 0 4px; accent-color:var(--accent);
+    background:transparent; cursor:pointer;
+  }
+  .w-info{
+    margin:0; display:flex; justify-content:space-between; gap:10px;
+    color:var(--muted); font-size:.7rem; font-variant-numeric:tabular-nums;
+  }
+  #g-span{ color:var(--accent); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .g-dot{ width:9px; height:9px; border-radius:50%; background:var(--gc); flex:0 0 auto; box-shadow:0 0 8px -1px var(--gc); }
+
+  /* ---------- Brújula ---------- */
+  #g-compass{
+    position:absolute; z-index:5; right:14px; bottom:calc(var(--time-h) + 16px);
+    display:flex; flex-direction:column; align-items:center; gap:4px;
+    color:var(--muted); font-size:.7rem; letter-spacing:.06em; pointer-events:none;
+    transition:bottom .25s ease;
+  }
+  #g-compass svg{ width:74px; height:74px; overflow:visible; }
+  .c-ring{ fill:rgba(9,17,31,.5); stroke:rgba(255,255,255,.16); stroke-width:1; }
+  .c-grid{ fill:none; stroke:rgba(255,255,255,.13); stroke-width:.8; }
+  .c-eq{ fill:none; stroke:rgba(110,168,254,.5); stroke-width:1; }
+  .c-axis{ stroke:rgba(255,255,255,.2); stroke-width:.8; }
+  .c-dot{ fill:var(--accent); }
+  #c-read{ font-variant-numeric:tabular-nums; }
+
+  /* ---------- Ficha ---------- */
   #g-panel{
-    position:absolute; z-index:7; top:62px; right:10px; width:min(340px,calc(100% - 20px));
-    max-height:calc(100% - 130px); display:none; flex-direction:column;
-    background:rgba(13,22,38,.97); border:1px solid var(--line); border-radius:14px;
-    box-shadow:0 18px 44px rgba(0,0,0,.5); backdrop-filter:blur(8px);
+    position:absolute; z-index:7; top:66px; right:14px; width:min(346px,calc(100% - 28px));
+    max-height:calc(100% - var(--time-h) - 90px); display:none; flex-direction:column;
+    background:var(--panel); border:1px solid var(--line); border-radius:16px;
+    box-shadow:0 22px 60px rgba(0,0,0,.6); backdrop-filter:blur(12px);
+    transition:max-height .25s ease;
   }
   #g-panel.is-open{ display:flex; }
   #g-close{
-    position:absolute; top:8px; right:8px; z-index:2;
-    width:34px; height:34px; border-radius:9px; cursor:pointer;
-    background:rgba(255,255,255,.07); border:1px solid var(--line); color:var(--text); font-size:1rem;
+    position:absolute; top:9px; right:9px; z-index:2;
+    width:32px; height:32px; border-radius:9px; cursor:pointer;
+    background:rgba(255,255,255,.07); border:1px solid var(--line); color:var(--text); font-size:.95rem;
   }
-  #g-panel-body{ overflow-y:auto; padding:16px; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; }
+  #g-close:hover{ background:rgba(255,255,255,.14); }
+  #g-panel-body{ overflow-y:auto; padding:16px; overscroll-behavior:contain; }
   .g-panel-head{ display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding-right:38px; }
   .g-pill{
-    display:inline-block; padding:3px 10px; border-radius:999px; font-size:.72rem;
+    display:inline-block; padding:3px 10px; border-radius:999px; font-size:.7rem;
     text-transform:uppercase; letter-spacing:.09em; font-weight:700;
-    background:rgba(255,255,255,.08); color:var(--gc);
-    border:1px solid currentColor;
+    background:rgba(255,255,255,.08); color:var(--gc); border:1px solid currentColor;
   }
   @supports (background: color-mix(in srgb, red 20%, transparent)){
     .g-pill{
-      background:color-mix(in srgb, var(--gc) 20%, transparent);
+      background:color-mix(in srgb, var(--gc) 18%, transparent);
       border-color:color-mix(in srgb, var(--gc) 45%, transparent);
     }
   }
-  .g-dates{ color:var(--muted); font-size:.82rem; }
-  .g-panel-title{ margin:10px 0 6px; font-size:1.25rem; }
-  .g-summary{ margin:0 0 14px; color:var(--muted); font-size:.92rem; }
+  .g-dates{ color:var(--muted); font-size:.8rem; }
+  .g-panel-title{ margin:10px 0 6px; font-size:1.24rem; line-height:1.2; }
+  .g-summary{ margin:0 0 14px; color:var(--muted); font-size:.91rem; }
   .g-links{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px; }
   .g-link{
-    display:inline-flex; align-items:center; min-height:36px; padding:7px 13px;
+    display:inline-flex; align-items:center; min-height:34px; padding:6px 13px;
     border-radius:999px; background:rgba(110,168,254,.14); border:1px solid rgba(110,168,254,.3);
-    color:#cfe1ff; font-size:.83rem; font-weight:600;
+    color:#cfe1ff; font-size:.82rem; font-weight:600;
   }
   .g-link:hover,.g-link:focus-visible{ background:rgba(110,168,254,.26); }
-  .g-link::after{ content:'↗'; margin-left:6px; font-size:.78rem; opacity:.75; }
+  .g-link::after{ content:'↗'; margin-left:6px; font-size:.76rem; opacity:.75; }
   .g-sub{
-    margin:0 0 8px; font-size:.72rem; text-transform:uppercase; letter-spacing:.11em;
+    margin:0 0 8px; font-size:.68rem; text-transform:uppercase; letter-spacing:.12em;
     color:var(--muted); font-weight:700;
   }
-  .g-travel{ display:grid; gap:4px; margin-bottom:18px; }
+  .g-travel{ display:grid; gap:4px; }
   .g-travel-item{
-    display:flex; align-items:center; gap:9px; width:100%; min-height:42px;
-    padding:8px 10px; border-radius:9px; cursor:pointer; text-align:left;
-    background:rgba(255,255,255,.035); border:1px solid transparent; color:var(--text); font:inherit;
+    display:flex; align-items:center; gap:9px; width:100%; min-height:40px;
+    padding:7px 10px; border-radius:9px; cursor:pointer; text-align:left;
+    background:rgba(255,255,255,.035); border:1px solid transparent; color:var(--text);
   }
   .g-travel-item:hover,.g-travel-item:focus-visible{ background:rgba(110,168,254,.13); border-color:rgba(110,168,254,.3); }
   .g-travel-item.is-off{ opacity:.42; }
   .g-travel-txt{ display:flex; flex-direction:column; min-width:0; }
-  .g-travel-txt strong{ font-size:.9rem; font-weight:600; }
-  .g-travel-txt em{ font-style:normal; font-size:.74rem; color:var(--muted); }
-
-  .g-hint{ margin:10px 0 0; color:var(--muted); font-size:.85rem; }
-
-  @media (max-width:700px){
-    #graph3d{ height:clamp(380px,62vh,560px); }
-    #g-panel{
-      top:auto; bottom:0; left:0; right:0; width:100%;
-      max-height:62%; border-radius:16px 16px 0 0; border-bottom:none;
-    }
-    #g-toolbar{ bottom:auto; top:58px; }
-    .g-bar{ padding:8px; }
-    .g-chip{ font-size:.75rem; padding:5px 9px; }
-    .g-count{ display:none; }
-  }
+  .g-travel-txt strong{ font-size:.88rem; font-weight:600; }
+  .g-travel-txt em{ font-style:normal; font-size:.73rem; color:var(--muted); }
 
   /* ---------- Cronología ---------- */
-  .timeline{ display:grid; gap:12px; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); }
-  .timeline-item{ background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:16px; }
-  .timeline-item p{ margin:6px 0 0; color:var(--muted); }
-  .year{ color:var(--accent); font-weight:700; font-size:.95rem; }
-
-  footer{
-    margin-top:clamp(40px,8vw,64px); padding-top:20px;
-    border-top:1px solid var(--line); color:var(--muted); font-size:.9rem;
+  :root{ --time-h:196px; }
+  #g-time{
+    position:absolute; z-index:6; left:0; right:0; bottom:0;
+    background:linear-gradient(rgba(5,11,22,0),rgba(5,11,22,.86) 22%,rgba(5,11,22,.96));
+    padding:10px 14px calc(12px + env(safe-area-inset-bottom));
+    transition:transform .25s ease;
   }
+  #g-time.is-collapsed{ transform:translateY(calc(100% - 44px)); }
+  .t-head{ display:flex; align-items:baseline; gap:10px; margin-bottom:8px; }
+  .t-head h2{
+    margin:0; font-size:.72rem; text-transform:uppercase; letter-spacing:.14em;
+    color:var(--muted); font-weight:700; white-space:nowrap;
+  }
+  #t-context{
+    color:var(--text); font-size:.82rem; font-weight:600;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0;
+  }
+  #t-toggle{
+    margin-left:auto; flex:0 0 auto; min-height:30px; padding:4px 11px; border-radius:999px;
+    background:rgba(255,255,255,.06); border:1px solid var(--line); color:var(--muted);
+    font-size:.74rem; cursor:pointer;
+  }
+  #t-toggle:hover{ color:var(--text); }
+  .t-types{ display:flex; flex-wrap:wrap; gap:6px; margin:0 0 8px; }
+  .t-type{
+    display:inline-flex; align-items:center; gap:6px; min-height:28px;
+    padding:3px 10px; border-radius:999px; cursor:pointer; font-size:.74rem;
+    background:rgba(255,255,255,.04); border:1px solid var(--line); color:var(--muted);
+    transition:opacity .15s ease, color .15s ease, border-color .15s ease;
+  }
+  .t-type[aria-pressed="true"]{ color:var(--text); border-color:var(--gc); background:rgba(255,255,255,.07); }
+  .t-type[aria-pressed="false"]{ opacity:.5; }
+  .t-type[aria-pressed="false"] .g-dot{ background:transparent; border:1px solid currentColor; box-shadow:none; }
+  .t-type .g-dot{ width:8px; height:8px; }
+  .t-type-n{ font-size:.68rem; color:var(--muted); font-variant-numeric:tabular-nums; }
 
-  /* ---------- Móvil ---------- */
+  .t-axis{
+    position:relative; height:14px; margin:0 2px 4px;
+    display:flex; align-items:center; justify-content:space-between;
+    color:var(--muted); font-size:.66rem; letter-spacing:.05em;
+  }
+  .t-axis::before{
+    content:''; position:absolute; left:0; right:0; top:50%; height:1px;
+    background:linear-gradient(90deg,rgba(110,168,254,0),rgba(110,168,254,.55),rgba(178,140,255,.55),rgba(178,140,255,0));
+  }
+  .t-axis span{ position:relative; background:#070e1c; padding:0 6px; }
+  #t-track{
+    display:flex; gap:8px; overflow-x:auto; overflow-y:hidden;
+    padding:4px 2px 6px; scrollbar-width:thin; scroll-behavior:smooth;
+  }
+  #t-track::-webkit-scrollbar{ height:6px; }
+  #t-track::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.14); border-radius:99px; }
+  .t-card{
+    position:relative; flex:0 0 auto; width:154px; min-height:76px;
+    display:flex; flex-direction:column; gap:2px; text-align:left; cursor:pointer;
+    padding:9px 11px 10px; border-radius:11px; color:var(--text);
+    background:rgba(15,25,44,.9); border:1px solid var(--line);
+    border-top:2px solid var(--gc);
+    transition:transform .15s ease, border-color .15s ease, background .15s ease;
+  }
+  .t-card:hover,.t-card:focus-visible{ transform:translateY(-2px); border-color:var(--gc); background:rgba(21,34,58,.96); }
+  .t-card.is-selected{
+    background:rgba(110,168,254,.1); border-color:var(--gc);
+    box-shadow:0 0 0 1px var(--gc), 0 10px 30px -12px var(--gc);
+  }
+  .t-card.is-linked::after{
+    content:''; position:absolute; top:7px; right:8px;
+    width:6px; height:6px; border-radius:50%; background:var(--gc); box-shadow:0 0 8px -1px var(--gc);
+  }
+  .t-year{ color:var(--gc); font-size:.72rem; font-weight:700; letter-spacing:.04em; }
+  .t-name{
+    font-size:.85rem; font-weight:600; line-height:1.25;
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+  }
+  .t-rel{ margin-top:auto; color:var(--muted); font-size:.7rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .t-empty{ margin:0; color:var(--muted); font-size:.82rem; padding:14px 2px; }
+
+  /* ---------- Ayuda inicial ---------- */
+  #g-hint{
+    position:absolute; z-index:4; left:50%; bottom:calc(var(--time-h) + 18px);
+    margin:0; transform:translateX(-50%); pointer-events:none;
+    padding:7px 14px; border-radius:999px; white-space:nowrap;
+    background:rgba(11,20,36,.8); border:1px solid var(--line);
+    color:var(--muted); font-size:.76rem; backdrop-filter:blur(6px);
+    transition:opacity .5s ease;
+  }
+  #g-hint.is-gone{ opacity:0; }
+
   @media (max-width:860px){
-    .hero,.two-col{ grid-template-columns:1fr; }
+    :root{ --time-h:188px; }
+    #g-panel{
+      top:auto; bottom:var(--time-h); left:0; right:0; width:100%;
+      max-height:min(58%, 420px); border-radius:16px 16px 0 0; border-bottom:none;
+    }
+    #g-compass{ display:none; }
   }
   @media (max-width:700px){
-    .nav-toggle{ display:inline-flex; align-items:center; justify-content:center; }
-    .topbar{ flex-wrap:wrap; }
-    nav{
-      display:none; order:3; flex-basis:100%; flex-direction:column; gap:0;
-      padding-top:8px; border-top:1px solid var(--line); margin-top:8px;
-    }
-    nav.open{ display:flex; }
-    nav a{ padding:14px 4px; border-bottom:1px solid var(--line); }
-    nav a:last-child{ border-bottom:none; }
-  }
-  @media (max-width:420px){
-    .cards,.timeline{ grid-template-columns:1fr; }
-    .btn{ flex:1 1 100%; }
+    :root{ --time-h:180px; }
+    .g-bar{ padding:10px; gap:6px; }
+    .brand span{ display:none; }
+    .g-searchwrap{ flex:1 1 auto; }
+    #g-toolbar{ left:10px; right:10px; top:58px; max-width:none; }
+    .g-chip{ font-size:.72rem; padding:4px 9px; min-height:30px; }
+    .g-count{ display:none; }
+    .t-card{ width:136px; min-height:70px; }
+    #g-hint{ display:none; }
   }
   @media (prefers-reduced-motion:reduce){
-    html{ scroll-behavior:auto; }
     *{ transition:none !important; animation:none !important; }
   }
 </style>
 </head>
 <body>
 
-<header class="topbar">
-  <div class="brand">El Canon de Occidente</div>
-  <button class="nav-toggle" id="nav-toggle" aria-label="Abrir menú" aria-expanded="false" aria-controls="main-nav">☰</button>
-  <nav id="main-nav">
-    <a href="#explore">Explorar</a>
-    <a href="#entity">Entidad</a>
-    <a href="#graph">Grafo</a>
-    <a href="#timeline">Cronología</a>
-  </nav>
-</header>
+<div id="g-stage">
+  <div id="graph3d"></div>
 
-<main>
-  <section class="hero">
-    <div class="hero-copy">
-      <p class="eyebrow">Knowledge Operating System</p>
-      <h1>Una plataforma semántica para pensar Occidente como red.</h1>
-      <p>Conecta personas, obras, ideas, eventos y lugares en un grafo navegable, con fuentes, contexto y rutas de aprendizaje.</p>
-      <div class="hero-actions">
-        <a class="btn primary" href="#graph">Abrir el grafo 3D</a>
-        <a class="btn secondary" href="#explore">Explorar entidades</a>
-      </div>
+  <div class="g-bar">
+    <h1 class="brand">
+      <svg viewBox="0 0 32 32" aria-hidden="true">
+        <circle cx="16" cy="16" r="12" fill="none" stroke="#6ea8fe" stroke-width="1.6"/>
+        <ellipse cx="16" cy="16" rx="12" ry="4.6" fill="none" stroke="#b28cff" stroke-width="1.4"/>
+        <ellipse cx="16" cy="16" rx="4.6" ry="12" fill="none" stroke="rgba(255,255,255,.35)" stroke-width="1.1"/>
+        <circle cx="16" cy="16" r="2.4" fill="#6ea8fe"/>
+      </svg>
+      <span>El Canon de Occidente</span>
+    </h1>
+
+    <div class="g-searchwrap">
+      <input id="g-search" type="search" placeholder="Buscar en el canon…" autocomplete="off" aria-label="Buscar entidad" />
+      <div id="g-results" role="listbox"></div>
     </div>
-    <aside class="hero-card">
-      <h3>Vista actual</h3>
-      <p>Foco inicial: Grecia y Roma</p>
-      <ul>
-        <li>51 entidades</li>
-        <li>94 relaciones</li>
-        <li>5 grupos: personas, obras, ideas, eventos y lugares</li>
-      </ul>
-    </aside>
-  </section>
+    <button type="button" class="g-btn" id="g-labels-btn">Etiquetas</button>
+    <button type="button" class="g-btn" id="g-reset">Reiniciar</button>
+    <button type="button" class="g-btn" id="g-fullscreen">Ampliar</button>
+  </div>
 
-  <section id="explore" class="section">
-    <div class="section-title">
-      <h2>Entidades destacadas</h2>
-      <p>Selecciona una para ver su ficha y sus conexiones.</p>
-    </div>
-    <div class="cards" id="entity-list"></div>
-  </section>
-
-  <section id="entity" class="section two-col">
-    <article class="panel">
-      <h3 id="entity-name">Sócrates</h3>
-      <p id="entity-type" class="pill">Filósofo</p>
-      <p id="entity-summary"></p>
-      <div class="meta-grid">
-        <div><strong>Fechas</strong><p id="entity-dates"></p></div>
-        <div><strong>Lugar</strong><p id="entity-place"></p></div>
+  <div id="g-toolbar">
+    <div id="g-chipbox"></div>
+    <div class="g-window">
+      <div class="w-row">
+        <label class="w-label" for="g-years">Ventana ±</label>
+        <input id="g-years" type="number" min="1" max="1000000" step="1" inputmode="numeric" aria-label="Años alrededor del elemento seleccionado" />
+        <span class="w-unit">años</span>
       </div>
-      <div>
-        <strong>Fuentes</strong>
-        <ul id="entity-sources"></ul>
-      </div>
-    </article>
-
-    <article class="panel">
-      <h3>Conexiones</h3>
-      <ul id="entity-connections"></ul>
-    </article>
-  </section>
-
-  <section id="graph" class="section">
-    <div class="section-title">
-      <h2>Grafo semántico</h2>
-      <p>El corazón del producto. Arrastra para girar, rueda o pellizca para acercarte, pulsa un nodo para abrir su ficha.</p>
+      <input id="g-range" type="range" min="0" max="100" step="1" aria-label="Amplitud de la ventana temporal" />
+      <p class="w-info"><span id="g-count"></span><span id="g-span"></span></p>
     </div>
+  </div>
 
-    <div id="g-stage">
-      <div id="graph3d"></div>
+  <div id="g-compass" aria-hidden="true">
+    <svg viewBox="0 0 64 64">
+      <circle class="c-ring" cx="32" cy="32" r="24"/>
+      <ellipse class="c-grid" cx="32" cy="32" rx="24" ry="9"/>
+      <ellipse class="c-grid" cx="32" cy="32" rx="9" ry="24"/>
+      <ellipse class="c-eq" id="c-eq" cx="32" cy="32" rx="24" ry="9"/>
+      <line class="c-axis" x1="32" y1="4" x2="32" y2="60"/>
+      <circle class="c-dot" id="c-dot" cx="32" cy="8" r="3.4"/>
+    </svg>
+    <span id="c-read">0° · 0°</span>
+  </div>
 
-      <div class="g-bar">
-        <div class="g-searchwrap">
-          <input id="g-search" type="search" placeholder="Buscar en el canon…" autocomplete="off" aria-label="Buscar entidad" />
-          <div id="g-results" role="listbox"></div>
-        </div>
-        <button type="button" class="g-btn" id="g-labels-btn">Etiquetas</button>
-        <button type="button" class="g-btn" id="g-reset">Reiniciar</button>
-        <button type="button" class="g-btn" id="g-fullscreen">Ampliar</button>
-      </div>
+  <aside id="g-panel" aria-live="polite">
+    <button type="button" id="g-close" aria-label="Cerrar ficha">✕</button>
+    <div id="g-panel-body"></div>
+  </aside>
 
-      <div id="g-toolbar"></div>
+  <p id="g-hint">Arrastra para girar el globo · rueda para acercarte · pulsa un nodo</p>
 
-      <aside id="g-panel" aria-live="polite">
-        <button type="button" id="g-close" aria-label="Cerrar ficha">✕</button>
-        <div id="g-panel-body"></div>
-      </aside>
-    </div>
-
-    <p class="g-hint">51 entidades y 94 relaciones del foco inicial (Grecia y Roma). Cada ficha enlaza a Wikipedia y, cuando existe, al texto completo en Wikisource.</p>
-  </section>
-
-  <section id="timeline" class="section">
-    <div class="section-title">
+  <section id="g-time">
+    <div class="t-head">
       <h2>Cronología</h2>
-      <p>Una línea temporal que reúne personas, obras y eventos.</p>
+      <span id="t-context">el canon completo</span>
+      <button type="button" id="t-toggle" aria-expanded="true">Ocultar</button>
     </div>
-    <div class="timeline">
-      <div class="timeline-item"><span class="year">470 a. C.</span><p>Nace Sócrates.</p></div>
-      <div class="timeline-item"><span class="year">427 a. C.</span><p>Nace Platón.</p></div>
-      <div class="timeline-item"><span class="year">399 a. C.</span><p>Muerte de Sócrates.</p></div>
-      <div class="timeline-item"><span class="year">384 a. C.</span><p>Nace Aristóteles.</p></div>
-    </div>
+    <div class="t-types" id="t-types"></div>
+    <div class="t-axis"><span id="t-min"></span><span id="t-max"></span></div>
+    <div id="t-track"></div>
   </section>
-
-  <footer>
-    <p>El Canon de Occidente · MVP · <a href="https://github.com/seachad/Canon_Occidental">Repositorio</a></p>
-  </footer>
-</main>
-
-<script>
-(function () {
-  'use strict';
-
-  var entities = [
-    {
-      id: 'socrates',
-      name: 'Sócrates',
-      type: 'Filósofo',
-      summary: 'Figura central del pensamiento griego y punto de partida de la tradición filosófica occidental.',
-      dates: '470 a. C. – 399 a. C.',
-      place: 'Atenas',
-      connections: ['Platón', 'Aristóteles', 'Democracia', 'Juicio'],
-      sources: ['Platón – Apología', 'Jenofonte – Recuerdos de Sócrates']
-    },
-    {
-      id: 'platon',
-      name: 'Platón',
-      type: 'Filósofo',
-      summary: 'Autor de diálogos fundamentales y creador de una visión política y metafísica influyente.',
-      dates: '427 a. C. – 347 a. C.',
-      place: 'Atenas',
-      connections: ['Sócrates', 'Aristóteles', 'República', 'Idea'],
-      sources: ['La República', 'Fedón', 'Fedro']
-    },
-    {
-      id: 'aristoteles',
-      name: 'Aristóteles',
-      type: 'Filósofo',
-      summary: 'Sistema de lógica, ética y política que marcó la cultura europea.',
-      dates: '384 a. C. – 322 a. C.',
-      place: 'Estagira / Atenas',
-      connections: ['Platón', 'Política', 'Lógica', 'Metafísica'],
-      sources: ['Ética a Nicómaco', 'Política', 'Metafísica']
-    }
-  ];
-
-  var entityList = document.getElementById('entity-list');
-  var entityName = document.getElementById('entity-name');
-  var entityType = document.getElementById('entity-type');
-  var entitySummary = document.getElementById('entity-summary');
-  var entityDates = document.getElementById('entity-dates');
-  var entityPlace = document.getElementById('entity-place');
-  var entitySources = document.getElementById('entity-sources');
-  var entityConnections = document.getElementById('entity-connections');
-
-  function fillList(ul, items) {
-    ul.innerHTML = '';
-    items.forEach(function (text) {
-      var li = document.createElement('li');
-      li.textContent = text;
-      ul.appendChild(li);
-    });
-  }
-
-  function renderEntity(id) {
-    var entity = entities.filter(function (e) { return e.id === id; })[0] || entities[0];
-    entityName.textContent = entity.name;
-    entityType.textContent = entity.type;
-    entitySummary.textContent = entity.summary;
-    entityDates.textContent = entity.dates;
-    entityPlace.textContent = entity.place;
-    fillList(entitySources, entity.sources);
-    fillList(entityConnections, entity.connections);
-
-    Array.prototype.forEach.call(entityList.children, function (card) {
-      card.setAttribute('aria-pressed', String(card.dataset.id === entity.id));
-    });
-  }
-
-  function renderEntities() {
-    entityList.innerHTML = '';
-    entities.forEach(function (entity) {
-      var card = document.createElement('button');
-      card.type = 'button';
-      card.className = 'card';
-      card.dataset.id = entity.id;
-      card.setAttribute('aria-pressed', 'false');
-
-      var h3 = document.createElement('h3');
-      h3.textContent = entity.name;
-      var type = document.createElement('p');
-      type.className = 'card-type';
-      type.textContent = entity.type;
-      var summary = document.createElement('p');
-      summary.className = 'card-summary';
-      summary.textContent = entity.summary;
-
-      card.appendChild(h3);
-      card.appendChild(type);
-      card.appendChild(summary);
-
-      card.addEventListener('click', function () {
-        renderEntity(entity.id);
-        document.getElementById('entity').scrollIntoView({ behavior: 'smooth', block: 'start' });
-      });
-
-      entityList.appendChild(card);
-    });
-  }
-
-  // Menú móvil
-  var toggle = document.getElementById('nav-toggle');
-  var nav = document.getElementById('main-nav');
-
-  function closeNav() {
-    nav.classList.remove('open');
-    toggle.setAttribute('aria-expanded', 'false');
-    toggle.setAttribute('aria-label', 'Abrir menú');
-    toggle.textContent = '☰';
-  }
-
-  toggle.addEventListener('click', function () {
-    var open = nav.classList.toggle('open');
-    toggle.setAttribute('aria-expanded', String(open));
-    toggle.setAttribute('aria-label', open ? 'Cerrar menú' : 'Abrir menú');
-    toggle.textContent = open ? '✕' : '☰';
-  });
-
-  nav.addEventListener('click', function (e) {
-    if (e.target.tagName === 'A') closeNav();
-  });
-
-  window.addEventListener('resize', function () {
-    if (window.innerWidth > 700) closeNav();
-  });
-
-  renderEntities();
-  renderEntity('socrates');
-})();
-</script>
+</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="graph-data.js"></script>
